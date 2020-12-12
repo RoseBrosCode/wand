@@ -31,7 +31,7 @@ byte tensorArena[tensorArenaSize];
 
 // Array to map gesture index to a name
 const char* GESTURES[] = {
-  "tap",
+  "flick",
   "twist"
 };
 

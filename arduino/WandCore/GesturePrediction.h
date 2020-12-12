@@ -16,7 +16,8 @@
 #include "IMUClient.h"
 
 // Trained model file
-#include "model.h"
+#include "model1_2ges_nolasso.h"
+
 
 // TensorFlow Lite dependencies
 #include <TensorFlowLite_ESP32.h>
@@ -27,7 +28,7 @@
 #include <tensorflow/lite/version.h>
 
 // Definitions of gesture indices
-#define GESTURE_TAP 0
+#define GESTURE_FLICK 0
 #define GESTURE_TWIST 1
 
 // Number of gestures
