@@ -42,6 +42,17 @@ float gestureConfidence[NUM_GESTURES];
 const float accelerationThresholdG = 2.5;
 ////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////
+// Color Sensor Client
+////////////////////////////////////////////////////////////////////////////////////
+#include "ColorSensorClient.h"
+
+// Color values read from the color sensor
+float sensorR;
+float sensorG;
+float sensorB;
+////////////////////////////////////////////////////////////////////////////////////
+
 void setup() 
 {
   // Initialize Serial port
@@ -63,6 +74,12 @@ void setup()
   Serial.println("WiFi connected");  
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+
+  // Configure color sensor
+  setupColorSensor(16);
+
+  // Turn onboard LED off
+  setLED(false);
 
   // Configure 9DoF IMU
   setupIMU();
