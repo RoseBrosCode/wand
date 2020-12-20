@@ -13,7 +13,7 @@ ICM_20948_I2C myICM;
 TwoWire i2cPort = TwoWire(0);
 
 // Flag that enables debug printing
-#define DEBUG_IMU_CLIENT 1
+#define DEBUG_IMU_CLIENT 0
 
 /*
  * Initializes the I2C connection to the 9DoF IMU sensor, and configures its output values.
@@ -37,7 +37,7 @@ void setupIMU()
   myFSS.g = dps2000;
   myICM.setFullScale((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myFSS);
 
-  Serial.println("Successfully set up IMU");
+  Serial.println("Successfully set up IMU.");
 }
 
 /*

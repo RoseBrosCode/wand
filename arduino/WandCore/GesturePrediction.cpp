@@ -42,7 +42,7 @@ const int numSamples = 119;
 int samplesRead = numSamples;
 
 // Flag that enables debug printing
-#define DEBUG_GESTURE_PREDICTION 1
+#define DEBUG_GESTURE_PREDICTION 0
 
 /*
  * Loads the model file and instantiates input and output tensors.
