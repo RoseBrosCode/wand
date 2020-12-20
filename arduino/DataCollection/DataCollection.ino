@@ -51,7 +51,8 @@ void setup()
 
 // The absolute acceleration threshold to begin IMU values
 //  as part of a gesture
-const float accelerationThresholdG = 2.5;
+const float accelerationThresholdG = 5.25;
+const float gyroThreshold = 1250;
 
 // The number of IMU samples ("duration") per gesture
 const int numSamplesPerGesture = 119;
@@ -77,10 +78,20 @@ void loop()
             aY = myICM.accY() / 1000;
             aZ = myICM.accZ() / 1000;
 
+            // Read gyroscope values
+            gX = myICM.gyrX();
+            gY = myICM.gyrY();
+            gZ = myICM.gyrZ();
+
             // Calculate sum of acceleration and compare to threshold
             float aSum = fabs(aX) + fabs(aY) + fabs(aZ);
-            if (aSum >= accelerationThresholdG) 
+            float gSum = fabs(gX) + fabs(gY) + fabs(gZ);
+            if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) 
             {
+//                Serial.print("aSum: ");
+//                Serial.println(aSum);
+//                Serial.print("gSum: ");
+//                Serial.println(gSum);
                 // Start a new gesture recording by resetting sample counter
                 samplesRead = 0;
                 break;

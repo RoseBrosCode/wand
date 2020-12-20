@@ -1,3 +1,4 @@
 .vscode
 data
 environ.h
+.DS_Store
