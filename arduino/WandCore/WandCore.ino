@@ -39,7 +39,8 @@ float imuData[6];
 float gestureConfidence[NUM_GESTURES];
 
 // Threshold for gesture detection in G's
-const float accelerationThresholdG = 2.5;
+const float accelerationThresholdG = 5.25;
+const float gyroThreshold = 1250;
 ////////////////////////////////////////////////////////////////////////////////////
 
 void setup() 
@@ -92,26 +93,23 @@ void loop()
 
   // Calculate sum of acceleration and compare to threshold
   float aSum = fabs(imuData[AX]) + fabs(imuData[AY]) + fabs(imuData[AZ]);
+  float gSum = fabs(imuData[GX]) + fabs(imuData[GY]) + fabs(imuData[GZ]);
 
   // Acceleration threshold reached, predict gesture
-  if (aSum >= accelerationThresholdG) {
+  if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) {
     readAndPredictGesture(imuData, gestureConfidence);
     
-    // If it's a tap, toggle a light
-    if (gestureConfidence[GESTURE_TAP] > 0.9) 
+    // If it's a flick, turn the target light on. Twist, turn it off.
+    int lightID = 14; // CJ Room is 33, Piano Lamp is 14
+    if (gestureConfidence[GESTURE_FLICK] > 0.9) 
     {
-      int lightID = 14; // CJ Room is 33, Piano Lamp is 14
-      Serial.println("Toggling Light!");
-      if (myHue.getLightState(lightID) == 1) 
-      {
-        Serial.println("Hue Light is Currently On, Turning Light Off");
-        myHue.setLightPower(lightID, myHue.OFF);
-      }
-      else // Light lightID is off
-      {
-        Serial.println("Hue Light  is Currently Off, Turning Light On");
-        myHue.setLightPower(lightID, myHue.ON);
-      }
+      Serial.println("Flick! Light turning on.");
+      myHue.setLightPower(lightID, myHue.ON);
+    }
+    else if (gestureConfidence[GESTURE_TWIST] > 0.9)
+    {
+      Serial.println("Twist! Light turning off.");
+      myHue.setLightPower(lightID, myHue.OFF);
     }
   }
 }
