@@ -41,13 +41,13 @@ void getRGB(float *r, float *g, float *b)
   bool stateOnCall = digitalRead(ledPin);
   
   // Turn LED on for measurement
-  setLED(true);
+  setColorSensorLED(true);
   
   // Read color sensor
   myTCS.getRGB(r, g, b);
 
   // Turn LED to previous state
-  setLED(stateOnCall);
+  setColorSensorLED(stateOnCall);
 
   // Debug print the value read
   if (DEBUG_COLOR_SENSOR_CLIENT) {
@@ -63,7 +63,7 @@ void getRGB(float *r, float *g, float *b)
 /*
  * Sets the sensor's LED.
  */
-void setLED(bool val)
+void setColorSensorLED(bool val)
 {
   digitalWrite(ledPin, val);
 }

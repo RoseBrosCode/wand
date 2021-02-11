@@ -54,6 +54,11 @@ float sensorG;
 float sensorB;
 ////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////
+// RGB LED Client
+////////////////////////////////////////////////////////////////////////////////////
+#include "LEDClient.h"
+////////////////////////////////////////////////////////////////////////////////////
 
 void setup() 
 {
@@ -78,16 +83,22 @@ void setup()
   Serial.println(WiFi.localIP());
 
   // Configure color sensor
-  setupColorSensor(16);
+  setupColorSensor(14);
 
   // Turn onboard LED off
-  setLED(false);
+  setColorSensorLED(false);
 
   // Configure 9DoF IMU
   setupIMU();
 
   // Configure TFLM
   setupGesturePrediction();
+
+  // Configure RGB LED
+  setupRGBLED(21, 17, 16);
+
+  // Turn RGB LED off
+  setRGBLED(0, 0, 0);
 
   // Use the built-in LED as visual feedback
   pinMode(LED_BUILTIN, OUTPUT);
@@ -100,6 +111,27 @@ void setup()
   digitalWrite(LED_BUILTIN, HIGH);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
+}
+
+void testDevices()
+{
+  // Test RGB LED
+  setRGBLED(255, 0, 0);
+  delay(1000);
+  setRGBLED(0, 255, 0);
+  delay(1000);
+  setRGBLED(0, 0, 255);
+  delay(1000);
+
+  // Test color sensor
+  setColorSensorLED(true);
+  delay(1000);
+  setColorSensorLED(false);
+  for (int i = 0; i < 5; i++)
+  {
+    getRGB(&sensorR, &sensorG, &sensorB);
+    delay(200);
+  }
 }
 
 void loop() 
