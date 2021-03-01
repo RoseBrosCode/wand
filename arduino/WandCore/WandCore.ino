@@ -89,7 +89,7 @@ int touchPin = T8;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
-// Touch Button
+// Set up remote debug
 ////////////////////////////////////////////////////////////////////////////////////
 #include <RemoteDebug.h>        //https://github.com/JoaoLopesF/RemoteDebug
 
@@ -119,8 +119,18 @@ void setup()
   Serial.println(WiFi.localIP());
 
 
-  // Set Up OTA
+  // Set Hostname (for OTA and Debug)
   ArduinoOTA.setHostname(HOST_NAME);
+
+  // Configure Remote Debug
+  MDNS.addService("telnet", "tcp", 23);
+  Debug.begin(HOST_NAME); // Initialize the WiFi server
+  Debug.setResetCmdEnabled(true); // Enable the reset command
+  Debug.showProfiler(true); // Profiler (Good to measure times, to optimize codes)
+  Debug.showColors(true); // Colors 
+  Debug.setSerialEnabled(true); // Forwards all logs to serial
+
+  // Configure OTA
   ArduinoOTA
     .onStart([]() {
       String type;
@@ -130,41 +140,26 @@ void setup()
         type = "filesystem";
 
       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-      Serial.println("Start updating " + type);
-//      debugI("Start updating " + type); // also send to remote logging
+      debugI("Start updating %d", type);
     })
     .onEnd([]() {
-      Serial.println("\nEnd");
-//      debugI("/nEnd"); // also send to remote logging
+      debugI("/nEnd");
     })
     .onProgress([](unsigned int progress, unsigned int total) {
-      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-//      debugI("Progress: %u%%\r", (progress / (total / 100))); // also send to remote logging
+      // KNOWN ISSUE - OTAing while telnet is open will cause the upload to fail. Need to implement throttling.
+      debugI("Progress: %d, Total: %d", progress, total);
     })
     .onError([](ota_error_t error) {
-      Serial.printf("Error[%u]: ", error);
-      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      debugE("OTA Error[%d]: ", error);
+      if (error == OTA_AUTH_ERROR) debugE("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) debugE("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) debugE("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) debugE("Receive Failed");
+      else if (error == OTA_END_ERROR) debugE("End Failed");
     });
 
   ArduinoOTA.begin();
-  
-// // Below may not be needed, ArduinoOTA.setHostname may do it.
-//  if (MDNS.begin(HOST_NAME)) {
-//      Serial.print("MDNS responder started. Hostname -> ");
-//      Serial.println(HOST_NAME);
-//  }
 
-  // Configure Remote Debug
-  MDNS.addService("telnet", "tcp", 23);
-  Debug.begin(HOST_NAME); // Initialize the WiFi server
-  Debug.setResetCmdEnabled(true); // Enable the reset command
-  Debug.showProfiler(true); // Profiler (Good to measure times, to optimize codes)
-  Debug.showColors(true); // Colors
-  
   // Configure color sensor
   setupColorSensor(14);
 
@@ -235,21 +230,20 @@ void loop()
   // Acceleration threshold reached, predict gesture
   if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) {
     readAndPredictGesture(imuData, gestureConfidence);
+    int capVal = touchRead(touchPin);
     
     // If it's a flick, turn the target light on. Twist, turn it off.
     int lightID = 14; // CJ Room is 33, Piano Lamp is 14
     if (gestureConfidence[GESTURE_FLICK] > 0.9) 
     {
-      Serial.println("Flick! Light turning on.");
       debugI("Flick! Light turning on.");
-
+      debugI("Touch Value is %d.", capVal);
       myHue.setLightPower(lightID, myHue.ON);
     }
     else if (gestureConfidence[GESTURE_TWIST] > 0.9)
     {
-      Serial.println("Twist! Light turning off.");
       debugI("Twist! Light turning off.");
-
+      debugI("Touch Value is %d.", capVal);
       myHue.setLightPower(lightID, myHue.OFF);
     }
   }
