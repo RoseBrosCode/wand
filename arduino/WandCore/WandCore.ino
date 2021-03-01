@@ -23,6 +23,12 @@ WiFiClient client;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
+// OTA updating
+////////////////////////////////////////////////////////////////////////////////////
+#include <ArduinoOTA.h>
+////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////
 // Hue Client
 ////////////////////////////////////////////////////////////////////////////////////
 // Add Hue lib
@@ -112,13 +118,48 @@ void setup()
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  if (MDNS.begin(HOST_NAME)) {
-      Serial.print("* MDNS responder started. Hostname -> ");
-      Serial.println(HOST_NAME);
-  }
-  MDNS.addService("telnet", "tcp", 23);
+
+  // Set Up OTA
+  ArduinoOTA.setHostname(HOST_NAME);
+  ArduinoOTA
+    .onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
+
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+//      debugI("Start updating " + type); // also send to remote logging
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+//      debugI("/nEnd"); // also send to remote logging
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+//      debugI("Progress: %u%%\r", (progress / (total / 100))); // also send to remote logging
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+
+  ArduinoOTA.begin();
+  
+// // Below may not be needed, ArduinoOTA.setHostname may do it.
+//  if (MDNS.begin(HOST_NAME)) {
+//      Serial.print("MDNS responder started. Hostname -> ");
+//      Serial.println(HOST_NAME);
+//  }
 
   // Configure Remote Debug
+  MDNS.addService("telnet", "tcp", 23);
   Debug.begin(HOST_NAME); // Initialize the WiFi server
   Debug.setResetCmdEnabled(true); // Enable the reset command
   Debug.showProfiler(true); // Profiler (Good to measure times, to optimize codes)
@@ -182,8 +223,8 @@ void testDevices()
 
 void loop() 
 {
+  ArduinoOTA.handle();
   
-
   // Read IMU sensor
   readIMU(imuData);
 
@@ -200,12 +241,15 @@ void loop()
     if (gestureConfidence[GESTURE_FLICK] > 0.9) 
     {
       Serial.println("Flick! Light turning on.");
+      debugI("Flick! Light turning on.");
+
       myHue.setLightPower(lightID, myHue.ON);
     }
     else if (gestureConfidence[GESTURE_TWIST] > 0.9)
     {
       Serial.println("Twist! Light turning off.");
-      debugI("Twist! Remote log.");
+      debugI("Twist! Light turning off.");
+
       myHue.setLightPower(lightID, myHue.OFF);
     }
   }
