@@ -3,9 +3,9 @@
 
   Contains variable definitions and main functions the Project Sparkle wand.
 */
-
+#define HOST_NAME "sparklewand"
 ////////////////////////////////////////////////////////////////////////////////////
-// Hue Client
+// WiFi Client
 ////////////////////////////////////////////////////////////////////////////////////
 #include <WiFiClient.h>
 #include <WiFi.h>
@@ -13,7 +13,18 @@
 
 // Connects to WiFi
 WiFiClient client;
+////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////
+// mDNS
+////////////////////////////////////////////////////////////////////////////////////
+#include <DNSServer.h>
+#include <ESPmDNS.h>
+////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////
+// Hue Client
+////////////////////////////////////////////////////////////////////////////////////
 // Add Hue lib
 #include <ESPHue.h>
 
@@ -71,6 +82,14 @@ float sensorB;
 int touchPin = T8;
 ////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////
+// Touch Button
+////////////////////////////////////////////////////////////////////////////////////
+#include <RemoteDebug.h>        //https://github.com/JoaoLopesF/RemoteDebug
+
+RemoteDebug Debug;
+////////////////////////////////////////////////////////////////////////////////////
+
 void setup() 
 {
   // Initialize Serial port
@@ -93,6 +112,18 @@ void setup()
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
+  if (MDNS.begin(HOST_NAME)) {
+      Serial.print("* MDNS responder started. Hostname -> ");
+      Serial.println(HOST_NAME);
+  }
+  MDNS.addService("telnet", "tcp", 23);
+
+  // Configure Remote Debug
+  Debug.begin(HOST_NAME); // Initialize the WiFi server
+  Debug.setResetCmdEnabled(true); // Enable the reset command
+  Debug.showProfiler(true); // Profiler (Good to measure times, to optimize codes)
+  Debug.showColors(true); // Colors
+  
   // Configure color sensor
   setupColorSensor(14);
 
@@ -122,6 +153,8 @@ void setup()
   digitalWrite(LED_BUILTIN, HIGH);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
+
+  // testDevices();
 }
 
 void testDevices()
@@ -132,6 +165,8 @@ void testDevices()
   setRGBLED(0, 255, 0);
   delay(1000);
   setRGBLED(0, 0, 255);
+  delay(1000);
+  setRGBLED(0, 0, 0);
   delay(1000);
 
   // Test color sensor
@@ -147,8 +182,8 @@ void testDevices()
 
 void loop() 
 {
-  // Wait for acceleration to begin gesture detection
   
+
   // Read IMU sensor
   readIMU(imuData);
 
@@ -170,7 +205,10 @@ void loop()
     else if (gestureConfidence[GESTURE_TWIST] > 0.9)
     {
       Serial.println("Twist! Light turning off.");
+      debugI("Twist! Remote log.");
       myHue.setLightPower(lightID, myHue.OFF);
     }
   }
+
+  Debug.handle();
 }
