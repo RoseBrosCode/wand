@@ -26,6 +26,7 @@ WiFiClient client;
 // OTA updating
 ////////////////////////////////////////////////////////////////////////////////////
 #include <ArduinoOTA.h>
+int otaProgress = 0;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -82,10 +83,7 @@ float sensorB;
 ////////////////////////////////////////////////////////////////////////////////////
 
 // Pin used for capacitive touch button
-// NOTE: Touch pin T8 refers to physical pin 32, NOT 33 as it references in most
-//  documentation. This is due to some pin assignment issue, see:
-//  https://randomnerdtutorials.com/esp32-touch-pins-arduino-ide/
-int touchPin = T8;
+int touchPin = T9;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -143,11 +141,17 @@ void setup()
       debugI("Start updating %d", type);
     })
     .onEnd([]() {
-      debugI("/nEnd");
+      debugI("OTA upload complete. Rebooting...");
     })
     .onProgress([](unsigned int progress, unsigned int total) {
-      // KNOWN ISSUE - OTAing while telnet is open will cause the upload to fail. Need to implement throttling.
-      debugI("Progress: %d, Total: %d", progress, total);
+      int bigprog = 100 * progress;
+      int percent = bigprog / total;
+      int permod = percent % 10;
+      if (percent % 10 == 0 && percent > otaProgress) 
+      {
+        otaProgress = percent;
+        debugI("OTA upload is %d percent complete", percent);
+      }
     })
     .onError([](ota_error_t error) {
       debugE("OTA Error[%d]: ", error);
@@ -175,46 +179,53 @@ void setup()
   // Configure RGB LED
   setupRGBLED(21, 17, 16);
 
-  // Turn RGB LED off
-  setRGBLED(0, 0, 0);
-
   // Use the built-in LED as visual feedback
   pinMode(LED_BUILTIN, OUTPUT);
 
-  // Double flash to indicate end of setup
+  // Flash onboard and RGB LEDs to indicate end of setup
   digitalWrite(LED_BUILTIN, HIGH);
+  setRGBLED(255, 0, 0);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
+  setRGBLED(0, 0, 0);
   delay(200);
   digitalWrite(LED_BUILTIN, HIGH);
+  setRGBLED(0, 0, 255);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
+  setRGBLED(0, 0, 0);
+  delay(200);
+  digitalWrite(LED_BUILTIN, HIGH);
+  setRGBLED(0, 255, 0);
+  delay(200);
+  digitalWrite(LED_BUILTIN, LOW);
+  setRGBLED(0, 0, 0);
 
   // testDevices();
 }
 
-void testDevices()
-{
-  // Test RGB LED
-  setRGBLED(255, 0, 0);
-  delay(1000);
-  setRGBLED(0, 255, 0);
-  delay(1000);
-  setRGBLED(0, 0, 255);
-  delay(1000);
-  setRGBLED(0, 0, 0);
-  delay(1000);
-
-  // Test color sensor
-  setColorSensorLED(true);
-  delay(1000);
-  setColorSensorLED(false);
-  for (int i = 0; i < 5; i++)
-  {
-    getRGB(&sensorR, &sensorG, &sensorB);
-    delay(200);
-  }
-}
+//void testDevices()
+//{
+//  // Test RGB LED
+//  setRGBLED(255, 0, 0);
+//  delay(1000);
+//  setRGBLED(0, 255, 0);
+//  delay(1000);
+//  setRGBLED(0, 0, 255);
+//  delay(1000);
+//  setRGBLED(0, 0, 0);
+//  delay(1000);
+//
+//  // Test color sensor
+//  setColorSensorLED(true);
+//  delay(1000);
+//  setColorSensorLED(false);
+//  for (int i = 0; i < 5; i++)
+//  {
+//    getRGB(&sensorR, &sensorG, &sensorB);
+//    delay(200);
+//  }
+//}
 
 void loop() 
 {
