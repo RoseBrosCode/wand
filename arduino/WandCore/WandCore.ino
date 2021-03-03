@@ -100,7 +100,8 @@ RemoteDebug Debug;
 // Set up state
 ////////////////////////////////////////////////////////////////////////////////////
 int wandMode = 1; // 1 = power/brightness, 2 = color
-int rainbowSection = 1; // 1 through 6, one for each section of https://academe.co.uk/wp-content/uploads/2012/04/451px-HSV-RGB-comparison.svg_.png
+int rainbowSection = 1; // this holds the state of where in the 6 rainbow sections the colorloop is
+int rainbowVar = 0; // this holds the state of the rgb colorloop variable
 ////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -244,13 +245,46 @@ void loop()
   // If in Color Mode, increment the RGB LED in the loop
   if (wandMode == 2)
   {
-    // coming next
+    switch (rainbowSection) // implementing the 6 sections here https://academe.co.uk/wp-content/uploads/2012/04/451px-HSV-RGB-comparison.svg_.png
+    {
+      case 1: // red stays up, green goes up, blue stays down
+        setRGBLED(255, rainbowVar, 0);
+        rainbowVar++;
+        if (rainbowVar == 255) rainbowSection++;
+        break;
+      case 2: // red goes down, green stays up, blue stays down
+        setRGBLED(rainbowVar, 255, 0);
+        rainbowVar--;
+        if (rainbowVar == 0) rainbowSection++;
+        break;
+      case 3: // red stays down, green stays up, blue goes up
+        setRGBLED(0, 255, rainbowVar);
+        rainbowVar++;
+        if (rainbowVar == 255) rainbowSection++;
+        break;
+      case 4: // red stays down, green goes down, blue stays up
+        setRGBLED(0, rainbowVar, 255);
+        rainbowVar--;
+        if (rainbowVar == 0) rainbowSection++;
+        break;
+      case 5: // red goes up, green stays down, blue stays up
+        setRGBLED(rainbowVar, 0, 255);
+        rainbowVar++;
+        if (rainbowVar == 255) rainbowSection++;
+        break;
+      case 6: // red stays up, green stays down, blue goes down
+        setRGBLED(255, 0, rainbowVar);
+        rainbowVar--;
+        if (rainbowVar == 0) rainbowSection = 1;
+        break;
+    }
   }
 
   // Read the touch surface
   int currentTouchEvent = getTouchEvent(touchPin);
 
-  switch (currentTouchEvent) {
+  switch (currentTouchEvent)
+  {
     case 1: // single tap
       // trigger color sensor
       debugI("single tap happened");
@@ -263,6 +297,7 @@ void loop()
         wandMode = 2;
         setRGBLED(255, 0, 0); // colorloop starts on red
         rainbowSection = 1; // colorloop starts at the beginning of the rainbow
+        rainbowVar = 0; // start at the beginning of the rainbow
         debugI("Switched to Color Mode");
       }
       else
