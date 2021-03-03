@@ -79,11 +79,13 @@ float sensorB;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
-// Touch Button
+// Touch Surface
 ////////////////////////////////////////////////////////////////////////////////////
+#include "CAPClient.h"
 
 // Pin used for capacitive touch button
 int touchPin = T9;
+int logDelay = 0;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -93,6 +95,14 @@ int touchPin = T9;
 
 RemoteDebug Debug;
 ////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////
+// Set up state
+////////////////////////////////////////////////////////////////////////////////////
+int wandMode = 1; // 1 = power/brightness, 2 = color
+int rainbowSection = 1; // 1 through 6, one for each section of https://academe.co.uk/wp-content/uploads/2012/04/451px-HSV-RGB-comparison.svg_.png
+////////////////////////////////////////////////////////////////////////////////////
+
 
 void setup() 
 {
@@ -199,7 +209,7 @@ void setup()
   setRGBLED(0, 255, 0);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
-  setRGBLED(0, 0, 0);
+  setRGBLED(255, 255, 255); // white for power mode, which is default
 
   // testDevices();
 }
@@ -230,6 +240,50 @@ void setup()
 void loop() 
 {
   ArduinoOTA.handle();
+
+  // If in Color Mode, increment the RGB LED in the loop
+  if (wandMode == 2)
+  {
+    // coming next
+  }
+
+  // Read the touch surface
+  int currentTouchEvent = getTouchEvent(touchPin);
+
+  switch (currentTouchEvent) {
+    case 1: // single tap
+      // trigger color sensor
+      debugI("single tap happened");
+      
+      break;
+    case 2: // double tap
+      // change mode
+      if (wandMode == 1)
+      {
+        wandMode = 2;
+        setRGBLED(255, 0, 0); // colorloop starts on red
+        rainbowSection = 1; // colorloop starts at the beginning of the rainbow
+        debugI("Switched to Color Mode");
+      }
+      else
+      {
+        wandMode = 1;
+        setRGBLED(255, 255, 255); // white for power mode
+        debugI("Switched to Power Mode"); 
+      }      
+      
+      break;
+    case 3: // tap and hold
+      // adjust brightness or color depending on mode
+      if (logDelay == 0 || logDelay == 100)
+      {
+        debugI("touch is being held");
+        logDelay = 0;
+      }
+      logDelay++;
+      
+      break;
+  }
   
   // Read IMU sensor
   readIMU(imuData);
