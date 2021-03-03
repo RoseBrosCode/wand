@@ -37,6 +37,9 @@ int otaProgress = 0;
 
 // Hue lib singleton
 ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
+
+// Defines the light the wand is hard-coded to. 
+int lightID = 14; // CJ's Room is 33, Piano Lamp is 14
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +105,7 @@ RemoteDebug Debug;
 int wandMode = 1; // 1 = power/brightness, 2 = color
 int rainbowSection = 1; // this holds the state of where in the 6 rainbow sections the colorloop is
 int rainbowVar = 0; // this holds the state of the rgb colorloop variable
+bool isLightColorloopOn = false; // this holds the state of the target bulb's colorloop
 ////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -330,21 +334,36 @@ void loop()
   // Acceleration threshold reached, predict gesture
   if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) {
     readAndPredictGesture(imuData, gestureConfidence);
-    int capVal = touchRead(touchPin);
     
-    // If it's a flick, turn the target light on. Twist, turn it off.
-    int lightID = 14; // CJ Room is 33, Piano Lamp is 14
-    if (gestureConfidence[GESTURE_FLICK] > 0.9) 
+    // 
+    if (gestureConfidence[GESTURE_FLICK] > 0.9) // do flick things!
     {
-      debugI("Flick! Light turning on.");
-      debugI("Touch Value is %d.", capVal);
-      myHue.setLightPower(lightID, myHue.ON);
+      debugI("Flick registered. Mode is %d.", wandMode);
+      if (wandMode == 1) myHue.setLightPower(lightID, myHue.ON); // power mode, turn on the light
+      else if (wandMode == 2) // color mode, cycle through color presets
+      {
+        
+      }
+      
     }
-    else if (gestureConfidence[GESTURE_TWIST] > 0.9)
+    else if (gestureConfidence[GESTURE_TWIST] > 0.9) // do twist things!
     {
-      debugI("Twist! Light turning off.");
-      debugI("Touch Value is %d.", capVal);
-      myHue.setLightPower(lightID, myHue.OFF);
+      debugI("Twist registered. Mode is %d", wandMode);
+      if (wandMode == 1) myHue.setLightPower(lightID, myHue.OFF); // power mode, turn off the light
+      else if (wandMode == 2) // color mode, toggle colorloop on bulb
+      {
+        if (isLightColorloopOn) 
+        {
+          myHue.setLightColorloop(lightID, myHue.OFF);
+          isLightColorloopOn = false;
+        }
+        else
+        {
+          myHue.setLightColorloop(lightID, myHue.ON);
+          isLightColorloopOn = true;
+        }
+      }
+      
     }
   }
 
