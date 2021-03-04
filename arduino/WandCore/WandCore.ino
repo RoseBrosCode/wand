@@ -84,11 +84,9 @@ float sensorB;
 ////////////////////////////////////////////////////////////////////////////////////
 // Touch Surface
 ////////////////////////////////////////////////////////////////////////////////////
-#include "CAPClient.h"
+#include "TouchSurfaceClient.h"
 
-// Pin used for capacitive touch button
-int touchPin = T9;
-int logDelay = 0;
+int lastLogged = -1; // DEBUG ONLY
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -102,10 +100,11 @@ RemoteDebug Debug;
 ////////////////////////////////////////////////////////////////////////////////////
 // Set up state
 ////////////////////////////////////////////////////////////////////////////////////
-int wandMode = 1; // 1 = power/brightness, 2 = color
-int rainbowSection = 1; // this holds the state of where in the 6 rainbow sections the colorloop is
-int rainbowVar = 0; // this holds the state of the rgb colorloop variable
-bool isLightColorloopOn = false; // this holds the state of the target bulb's colorloop
+// wand mode definitions
+#define POWER 0
+#define COLOR 1
+int wandMode = POWER; // default on boot
+bool isLightColorloopOn = false; // this holds the state of the *target light bulb's* colorloop
 ////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -113,9 +112,7 @@ void setup()
 {
   // Initialize Serial port
   Serial.begin(115200);
-  while (!Serial)
-  {
-  };
+  while (!Serial) {};
 
   // Connect to WiFi
   Serial.println();
@@ -151,7 +148,6 @@ void setup()
         type = "sketch";
       else // U_SPIFFS
         type = "filesystem";
-
       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
       debugI("Start updating %d", type);
     })
@@ -159,12 +155,10 @@ void setup()
       debugI("OTA upload complete. Rebooting...");
     })
     .onProgress([](unsigned int progress, unsigned int total) {
-      int bigprog = 100 * progress;
-      int percent = bigprog / total;
-      int permod = percent % 10;
-      if (percent % 10 == 0 && percent > otaProgress) 
-      {
-        otaProgress = percent;
+      int numProgress = 100 * progress;                       // this step enables the next step
+      int percent = numProgress / total;                      // get progress as a percentage - int will be truncated
+      if (percent % 10 == 0 && percent > otaProgress) {       // every 10 percent of progress, print the percentage, and don't print the same percentage repeatedly
+        otaProgress = percent;                                // allows for only printing the percentage once, since there will be numerous calls where percent % 10 results in the same number
         debugI("OTA upload is %d percent complete", percent);
       }
     })
@@ -194,6 +188,9 @@ void setup()
   // Configure RGB LED
   setupRGBLED(21, 17, 16);
 
+  // Configure touch surface
+  setupTouchSurface(T9);
+
   // Use the built-in LED as visual feedback
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -216,110 +213,75 @@ void setup()
   digitalWrite(LED_BUILTIN, LOW);
   setRGBLED(255, 255, 255); // white for power mode, which is default
 
+  // DEBUG ONLY
   // testDevices();
 }
 
-//void testDevices()
-//{
-//  // Test RGB LED
-//  setRGBLED(255, 0, 0);
-//  delay(1000);
-//  setRGBLED(0, 255, 0);
-//  delay(1000);
-//  setRGBLED(0, 0, 255);
-//  delay(1000);
-//  setRGBLED(0, 0, 0);
-//  delay(1000);
-//
-//  // Test color sensor
-//  setColorSensorLED(true);
-//  delay(1000);
-//  setColorSensorLED(false);
-//  for (int i = 0; i < 5; i++)
-//  {
-//    getRGB(&sensorR, &sensorG, &sensorB);
-//    delay(200);
-//  }
-//}
+/*
+ * Exercises attached devices 
+ */
+void testDevices()
+{
+  // Test RGB LED
+  setRGBLED(255, 0, 0);
+  delay(1000);
+  setRGBLED(0, 255, 0);
+  delay(1000);
+  setRGBLED(0, 0, 255);
+  delay(1000);
+  setRGBLED(0, 0, 0);
+  delay(1000);
+
+  // Test color sensor
+  setColorSensorLED(true);
+  delay(1000);
+  setColorSensorLED(false);
+  for (int i = 0; i < 5; i++)
+  {
+    getRGB(&sensorR, &sensorG, &sensorB);
+    delay(200);
+  }
+}
 
 void loop() 
 {
+  // Check for OTA
   ArduinoOTA.handle();
 
   // If in Color Mode, increment the RGB LED in the loop
-  if (wandMode == 2)
-  {
-    switch (rainbowSection) // implementing the 6 sections here https://academe.co.uk/wp-content/uploads/2012/04/451px-HSV-RGB-comparison.svg_.png
-    {
-      case 1: // red stays up, green goes up, blue stays down
-        setRGBLED(255, rainbowVar, 0);
-        rainbowVar++;
-        if (rainbowVar == 255) rainbowSection++;
-        break;
-      case 2: // red goes down, green stays up, blue stays down
-        setRGBLED(rainbowVar, 255, 0);
-        rainbowVar--;
-        if (rainbowVar == 0) rainbowSection++;
-        break;
-      case 3: // red stays down, green stays up, blue goes up
-        setRGBLED(0, 255, rainbowVar);
-        rainbowVar++;
-        if (rainbowVar == 255) rainbowSection++;
-        break;
-      case 4: // red stays down, green goes down, blue stays up
-        setRGBLED(0, rainbowVar, 255);
-        rainbowVar--;
-        if (rainbowVar == 0) rainbowSection++;
-        break;
-      case 5: // red goes up, green stays down, blue stays up
-        setRGBLED(rainbowVar, 0, 255);
-        rainbowVar++;
-        if (rainbowVar == 255) rainbowSection++;
-        break;
-      case 6: // red stays up, green stays down, blue goes down
-        setRGBLED(255, 0, rainbowVar);
-        rainbowVar--;
-        if (rainbowVar == 0) rainbowSection = 1;
-        break;
-    }
+  if (wandMode == COLOR) {
+    incrementRGBColorloop();
   }
 
-  // Read the touch surface
-  int currentTouchEvent = getTouchEvent(touchPin);
-
+  // Read the touch surface and handle the event
+  int currentTouchEvent = getTouchEvent();
   switch (currentTouchEvent)
   {
-    case 1: // single tap
+    case SINGLE_TAP:
       // trigger color sensor
       debugI("single tap happened");
       
       break;
-    case 2: // double tap
+    case DOUBLE_TAP:
+      debugI("double tap happened");
       // change mode
-      if (wandMode == 1)
-      {
-        wandMode = 2;
-        setRGBLED(255, 0, 0); // colorloop starts on red
-        rainbowSection = 1; // colorloop starts at the beginning of the rainbow
-        rainbowVar = 0; // start at the beginning of the rainbow
+      if (wandMode == POWER) {
+        wandMode = COLOR;
+        incrementRGBColorloop(); 
         debugI("Switched to Color Mode");
-      }
-      else
-      {
-        wandMode = 1;
+      } else {
+        wandMode = POWER;
         setRGBLED(255, 255, 255); // white for power mode
         debugI("Switched to Power Mode"); 
       }      
       
       break;
-    case 3: // tap and hold
-      // adjust brightness or color depending on mode
-      if (logDelay == 0 || logDelay == 100)
-      {
+    case HOLDING:
+      // TODO adjust brightness or color depending on mode
+      if ((millis() - lastLogged) >= 500) { // DEBUG ONLY, throttling log output
         debugI("touch is being held");
-        logDelay = 0;
+        lastLogged = millis();
       }
-      logDelay++;
       
       break;
   }
@@ -335,30 +297,23 @@ void loop()
   if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) {
     readAndPredictGesture(imuData, gestureConfidence);
     
-    // 
-    if (gestureConfidence[GESTURE_FLICK] > 0.9) // do flick things!
-    {
+    if (gestureConfidence[GESTURE_FLICK] > 0.9) { // it's a flick, do flick things!
       debugI("Flick registered. Mode is %d.", wandMode);
-      if (wandMode == 1) myHue.setLightPower(lightID, myHue.ON); // power mode, turn on the light
-      else if (wandMode == 2) // color mode, cycle through color presets
-      {
+      if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON); // turn on the light
+      else if (wandMode == COLOR) { // color mode, cycle through color presets
         
       }
       
     }
-    else if (gestureConfidence[GESTURE_TWIST] > 0.9) // do twist things!
-    {
+    else if (gestureConfidence[GESTURE_TWIST] > 0.9) { // it's a twist, do twist things!    
       debugI("Twist registered. Mode is %d", wandMode);
-      if (wandMode == 1) myHue.setLightPower(lightID, myHue.OFF); // power mode, turn off the light
-      else if (wandMode == 2) // color mode, toggle colorloop on bulb
-      {
-        if (isLightColorloopOn) 
-        {
+      if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // turn off the light
+      else if (wandMode == COLOR) { // toggle colorloop on bulb
+        if (isLightColorloopOn) {
           myHue.setLightColorloop(lightID, myHue.OFF);
           isLightColorloopOn = false;
         }
-        else
-        {
+        else {
           myHue.setLightColorloop(lightID, myHue.ON);
           isLightColorloopOn = true;
         }
@@ -367,5 +322,6 @@ void loop()
     }
   }
 
+  // facilitates remote debugging
   Debug.handle();
 }
