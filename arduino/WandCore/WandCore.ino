@@ -268,7 +268,7 @@ void loop()
     if (wandMode == POWER) {                      // power mode, single tap == set light brightness based on "brightness" of color sensed
       // TODO
     }
-    else if (wandMode == COLOR) {                 // color mode, single tap == cycle through pre-defined color favorites
+    else if (wandMode == COLOR) {                 // color mode, single tap == set color of light based on color sensed
       // TODO
     }
       
@@ -297,14 +297,13 @@ void loop()
     
     // read target light state
     // only do this here as it's not needed elsewhere and this minimizes polling
-
-    // prepare the raw string from the Hue library
+    // step 1 of 3 - prepare the raw string from the Hue library
     String rawLightState;
     rawLightState = myHue.getLightInfo(lightID);
     int removeToIdx = rawLightState.indexOf("{") - 1;
     rawLightState.remove(0, removeToIdx);
 
-    // parse the JSON
+    // step 2 of 3 - parse the JSON
     StaticJsonDocument<112> filter;
     JsonObject filter_state = filter.createNestedObject("state");
     filter_state["hue"] = true;
@@ -323,7 +322,7 @@ void loop()
       return;
     }
 
-    // assign temporary state variables
+    // step 3 of 3 - assign temporary state variables
     JsonObject lightCurrentState = doc["state"];
     long lightCurrentHue = lightCurrentState["hue"]; // 0(red)-65535(red); green = 21845 and blue = 43690
     bool lightCurrentPower = lightCurrentState["on"]; // true = light is on
@@ -332,7 +331,8 @@ void loop()
     int lightCurrentSaturation = lightCurrentState["sat"]; // 0(least saturated; white)-254(most saturated; full color)
     int lightCurrentColorTemp = lightCurrentState["ct"]; // 153-500 (6500K-2000K)
     debugI("Current light properties: Hue = %d, Brightness = %d, Saturation = %d, Temp = %d, effect = %s", lightCurrentHue, lightCurrentBrightness, lightCurrentSaturation, lightCurrentColorTemp, lightCurrentEffect);
-    
+
+    // process actions based on gesture, mode, and touch surface state
     if (gestureConfidence[GESTURE_FLICK] > 0.9) {                       // it's a flick, do flick things!
       debugI("Flick registered. Mode is %d.", wandMode);
       if (currentTouchEvent == HOLDING) {
