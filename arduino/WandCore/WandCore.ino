@@ -39,7 +39,7 @@ int otaProgress = 0;
 ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
 
 // Defines the light the wand is hard-coded to. 
-int lightID = 14; // CJ's Room is 33, Piano Lamp is 14
+int lightID = 33; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -98,13 +98,18 @@ RemoteDebug Debug;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
-// Set up state
+// JSON Library
+////////////////////////////////////////////////////////////////////////////////////
+#include <ArduinoJson.h>
+////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////
+// Set up wand state variables
 ////////////////////////////////////////////////////////////////////////////////////
 // wand mode definitions
 #define POWER 0
 #define COLOR 1
 int wandMode = POWER; // default on boot
-bool isLightColorloopOn = false; // this holds the state of the *target light bulb's* colorloop
 ////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -149,7 +154,7 @@ void setup()
       else // U_SPIFFS
         type = "filesystem";
       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-      debugI("Start updating %d", type);
+      debugI("Start updating %s", type);
     })
     .onEnd([]() {
       debugI("OTA upload complete. Rebooting...");
@@ -163,7 +168,7 @@ void setup()
       }
     })
     .onError([](ota_error_t error) {
-      debugE("OTA Error[%d]: ", error);
+      debugE("OTA Error[%s]: ", error);
       if (error == OTA_AUTH_ERROR) debugE("Auth Failed");
       else if (error == OTA_BEGIN_ERROR) debugE("Begin Failed");
       else if (error == OTA_CONNECT_ERROR) debugE("Connect Failed");
@@ -236,8 +241,7 @@ void testDevices()
   setColorSensorLED(true);
   delay(1000);
   setColorSensorLED(false);
-  for (int i = 0; i < 5; i++)
-  {
+  for (int i = 0; i < 5; i++) {
     getRGB(&sensorR, &sensorG, &sensorB);
     delay(200);
   }
@@ -253,72 +257,114 @@ void loop()
     incrementRGBColorloop();
   }
 
-  // Read the touch surface and handle the event
-  int currentTouchEvent = getTouchEvent();
-  switch (currentTouchEvent)
-  {
-    case SINGLE_TAP:
-      // trigger color sensor
-      debugI("single tap happened");
-      
-      break;
-    case DOUBLE_TAP:
-      debugI("double tap happened");
-      // change mode
-      if (wandMode == POWER) {
-        wandMode = COLOR;
-        incrementRGBColorloop(); 
-        debugI("Switched to Color Mode");
-      } else {
-        wandMode = POWER;
-        setRGBLED(255, 255, 255); // white for power mode
-        debugI("Switched to Power Mode"); 
-      }      
-      
-      break;
-    case HOLDING:
-      // TODO adjust brightness or color depending on mode
-      if ((millis() - lastLogged) >= 500) { // DEBUG ONLY, throttling log output
-        debugI("touch is being held");
-        lastLogged = millis();
-      }
-      
-      break;
-  }
-  
   // Read IMU sensor
   readIMU(imuData);
 
-  // Calculate sum of acceleration and compare to threshold
+  // Read the touch surface and handle the event
+  // Take immediate action if single tap or double tap; if holding, action happens only if gesture is detected
+  int currentTouchEvent = getTouchEvent();
+  if (currentTouchEvent == SINGLE_TAP) {
+    debugI("Single Tap Just Happened");
+    if (wandMode == POWER) {                      // power mode, single tap == set light brightness based on "brightness" of color sensed
+      // TODO
+    }
+    else if (wandMode == COLOR) {                 // color mode, single tap == cycle through pre-defined color favorites
+      // TODO
+    }
+      
+  } else if (currentTouchEvent == DOUBLE_TAP) {
+    debugI("Double Tap Just Happened");
+    // toggle the wand's mode
+    if (wandMode == POWER) {                      // power mode, double tap == switch to color mode
+      wandMode = COLOR;
+      incrementRGBColorloop();                    // resume cycling the onboard RGB through its colorloop
+      debugI("Switched to Color Mode");
+    } else {                                      // color mode, double tap == switch to power mode
+      wandMode = POWER;
+      setRGBLED(255, 255, 255);                   // solid white for power mode
+      debugI("Switched to Power Mode"); 
+    }
+  }
+
+  // Calculate sum of acceleration to compare to threshold
   float aSum = fabs(imuData[AX]) + fabs(imuData[AY]) + fabs(imuData[AZ]);
   float gSum = fabs(imuData[GX]) + fabs(imuData[GY]) + fabs(imuData[GZ]);
 
-  // Acceleration threshold reached, predict gesture
+  // Acceleration threshold reached, handle gesture
   if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) {
+    // do the gesture predicting
     readAndPredictGesture(imuData, gestureConfidence);
     
-    if (gestureConfidence[GESTURE_FLICK] > 0.9) { // it's a flick, do flick things!
-      debugI("Flick registered. Mode is %d.", wandMode);
-      if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON); // turn on the light
-      else if (wandMode == COLOR) { // color mode, cycle through color presets
-        
-      }
-      
+    // read target light state
+    // only do this here as it's not needed elsewhere and this minimizes polling
+
+    // prepare the raw string from the Hue library
+    String rawLightState;
+    rawLightState = myHue.getLightInfo(lightID);
+    int removeToIdx = rawLightState.indexOf("{") - 1;
+    rawLightState.remove(0, removeToIdx);
+
+    // parse the JSON
+    StaticJsonDocument<112> filter;
+    JsonObject filter_state = filter.createNestedObject("state");
+    filter_state["hue"] = true;
+    filter_state["on"] = true;
+    filter_state["effect"] = true;
+    filter_state["bri"] = true;
+    filter_state["sat"] = true;
+    filter_state["ct"] = true;
+    
+    StaticJsonDocument<192> doc;
+    
+    DeserializationError error = deserializeJson(doc, rawLightState, DeserializationOption::Filter(filter));
+    
+    if (error) {
+      debugE("deserializeJson failed: %s", error.c_str());
+      return;
     }
-    else if (gestureConfidence[GESTURE_TWIST] > 0.9) { // it's a twist, do twist things!    
+
+    // assign temporary state variables
+    JsonObject lightCurrentState = doc["state"];
+    long lightCurrentHue = lightCurrentState["hue"]; // 0(red)-65535(red); green = 21845 and blue = 43690
+    bool lightCurrentPower = lightCurrentState["on"]; // true = light is on
+    const char* lightCurrentEffect = lightCurrentState["effect"]; // "none" or "colorloop"
+    int lightCurrentBrightness = lightCurrentState["bri"]; // 1(minimum brightness)-254(maximum brightness)
+    int lightCurrentSaturation = lightCurrentState["sat"]; // 0(least saturated; white)-254(most saturated; full color)
+    int lightCurrentColorTemp = lightCurrentState["ct"]; // 153-500 (6500K-2000K)
+    debugI("Current light properties: Hue = %d, Brightness = %d, Saturation = %d, Temp = %d, effect = %s", lightCurrentHue, lightCurrentBrightness, lightCurrentSaturation, lightCurrentColorTemp, lightCurrentEffect);
+    
+    if (gestureConfidence[GESTURE_FLICK] > 0.9) {                       // it's a flick, do flick things!
+      debugI("Flick registered. Mode is %d.", wandMode);
+      if (currentTouchEvent == HOLDING) {
+        if (wandMode == POWER) {                                        // power mode, holding, flick == turn up the brightness
+          // TODO
+        }
+        else if (wandMode == COLOR) {                                   // color mode, holding, flick == increment color wheel on the light
+          // TODO
+        }
+      } else {
+        if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON);  // power mode, NOT holding, flick == turn on the light
+        else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == cycle through pre-defined color favorites
+          // TODO
+        }
+      }      
+    }
+    else if (gestureConfidence[GESTURE_TWIST] > 0.9) {                  // it's a twist, do twist things!    
       debugI("Twist registered. Mode is %d", wandMode);
-      if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // turn off the light
-      else if (wandMode == COLOR) { // toggle colorloop on bulb
-        if (isLightColorloopOn) {
-          myHue.setLightColorloop(lightID, myHue.OFF);
-          isLightColorloopOn = false;
+      if (currentTouchEvent == HOLDING) {
+        if (wandMode == POWER) {                                        // power mode, holding, twist == turn down the brightness
+          // TODO
         }
-        else {
-          myHue.setLightColorloop(lightID, myHue.ON);
-          isLightColorloopOn = true;
+        else if (wandMode == COLOR) {                                   // color mode, holding, twist == decrement color wheel on the light
+          // TODO
         }
-      }
-      
+      } else {
+        if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // power mode, NOT holding, twist == turn off the light
+        else if (wandMode == COLOR) {                                   // color mode, NOT holding, twist == toggle colorloop on light
+          if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
+          else myHue.setLightColorloop(lightID, myHue.ON);
+        }       
+      }      
     }
   }
 

@@ -10,8 +10,8 @@
 int touchPin;
 
 // Touch surface constants
-const int touchThold = 50;                  // readings above mean the sensor is not being touched
-const int debounce = 20;                    // ms debounce period to prevent flickering when touching or stopping to touch the surface
+const int touchThreshold = 50;              // readings above this value mean the sensor is not being touched
+const int debounce = 20;                    // ms debounce period to prevent flickering when touching or stopping of touching the surface
 const int doubleTapGap = 250;               // max ms between taps for a double tap event
 const int holdTime = 1000;                  // ms hold period: how long to wait for hold event; TODO experiment if this can shorten
 
@@ -20,7 +20,7 @@ boolean isTouched = false;                  // whether or not the touch surface 
 boolean wasTouchedLast = false;             // whether or not the touch surface was touched last loop
 boolean doubleTapWaiting = false;           // true if a double tap may be pending
 boolean doubleTapOnUp = false;              // true if double tap conditions have been met but the second tap is still being touched
-unsigned long downTime = -1;                // most recent time when the surface was first touched
+unsigned long downTime = -1;                // most recent time when the surface began to be touched
 unsigned long upTime = -1;                  // most recent time when the surface was stopped being touched
 boolean holdEventOngoing = false;           // true if a hold event started on a previous iteration and another new touch has not occured
 
@@ -39,7 +39,7 @@ void setupTouchSurface(int pin)
 bool checkIfTouched()
 {
   int touchVal = touchRead(touchPin);
-  if (touchVal > touchThold) return false;
+  if (touchVal > touchThreshold) return false;
   else return true;
 }
 
@@ -68,7 +68,7 @@ int getTouchEvent()
     && doubleTapWaiting == true) {          // we were waiting to see if it was a double tap (and not just a single tap)
       doubleTapOnUp = true;                 // this is a double tap! send the event when no longer being touched
       doubleTapWaiting = false;             // reset this since we're no longer waiting and seeing
-    } else  doubleTapOnUp = false;          // otherwise it's not a double tap
+    } else doubleTapOnUp = false;          // otherwise it's not a double tap
   }
   
   // Surface no longer being touched        
