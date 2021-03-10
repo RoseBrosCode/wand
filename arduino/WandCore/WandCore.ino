@@ -5,21 +5,9 @@
 */
 #define HOST_NAME "sparklewand"
 ////////////////////////////////////////////////////////////////////////////////////
-// WiFi Client
+// Include Globals
 ////////////////////////////////////////////////////////////////////////////////////
-#include <WiFiClient.h>
-#include <WiFi.h>
-#include "environ.h"
-
-// Connects to WiFi
-WiFiClient client;
-////////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////////
-// mDNS
-////////////////////////////////////////////////////////////////////////////////////
-#include <DNSServer.h>
-#include <ESPmDNS.h>
+#include "Globals.h"
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -30,13 +18,10 @@ int otaProgress = 0;
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
-// Hue Client
+// Hue Light Setup
 ////////////////////////////////////////////////////////////////////////////////////
-// Add Hue lib
-#include <ESPHue.h>
-
-// Hue lib singleton
-ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
+// include capability to get light state JSON custom for this sketch
+#include "LightStateJSON.h"
 
 // Defines the light the wand is hard-coded to. 
 int lightID = 33; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
@@ -87,20 +72,6 @@ float sensorB;
 #include "TouchSurfaceClient.h"
 
 int lastLogged = -1; // DEBUG ONLY
-////////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////////
-// Set up remote debug
-////////////////////////////////////////////////////////////////////////////////////
-#include <RemoteDebug.h>        //https://github.com/JoaoLopesF/RemoteDebug
-
-RemoteDebug Debug;
-////////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////////
-// JSON Library
-////////////////////////////////////////////////////////////////////////////////////
-#include <ArduinoJson.h>
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +139,7 @@ void setup()
       }
     })
     .onError([](ota_error_t error) {
-      debugE("OTA Error[%s]: ", error);
+      debugE("OTA Error[%d]: ", error);
       if (error == OTA_AUTH_ERROR) debugE("Auth Failed");
       else if (error == OTA_BEGIN_ERROR) debugE("Begin Failed");
       else if (error == OTA_CONNECT_ERROR) debugE("Connect Failed");
@@ -265,8 +236,9 @@ void loop()
   int currentTouchEvent = getTouchEvent();
   if (currentTouchEvent == SINGLE_TAP) {
     debugI("Single Tap Just Happened");
-    if (wandMode == POWER) {                      // power mode, single tap == set light brightness based on "brightness" of color sensed
-      // TODO
+    if (wandMode == POWER) {                      // power mode, single tap == currently does nothing intentionally
+      // intentionally blank
+      // available for future use
     }
     else if (wandMode == COLOR) {                 // color mode, single tap == set color of light based on color sensed
       // TODO
@@ -295,42 +267,18 @@ void loop()
     // do the gesture predicting
     readAndPredictGesture(imuData, gestureConfidence);
     
-    // read target light state
-    // only do this here as it's not needed elsewhere and this minimizes polling
-    // step 1 of 3 - prepare the raw string from the Hue library
-    String rawLightState;
-    rawLightState = myHue.getLightInfo(lightID);
-    int removeToIdx = rawLightState.indexOf("{") - 1;
-    rawLightState.remove(0, removeToIdx);
-
-    // step 2 of 3 - parse the JSON
-    StaticJsonDocument<112> filter;
-    JsonObject filter_state = filter.createNestedObject("state");
-    filter_state["hue"] = true;
-    filter_state["on"] = true;
-    filter_state["effect"] = true;
-    filter_state["bri"] = true;
-    filter_state["sat"] = true;
-    filter_state["ct"] = true;
+    // read target light state and set temporary state variables
+    // only do this here as it's not needed elsewhere and this minimizes polling   
+    JsonObject lightCurrentState;
+    lightCurrentState = getLightStateJSON(lightID);
+    long lightCurrentHue = lightCurrentState["hue"];                    // 0(red)-65535(red); green = 21845 and blue = 43690
+    bool lightCurrentPower = lightCurrentState["on"];                   // true = light is on
+    const char* lightCurrentEffect = lightCurrentState["effect"];       // "none" or "colorloop"
+    int lightCurrentBrightness = lightCurrentState["bri"];              // 1(minimum brightness)-254(maximum brightness)
+    int lightCurrentSaturation = lightCurrentState["sat"];              // 0(least saturated; white)-254(most saturated; full color)
+    int lightCurrentColorTemp = lightCurrentState["ct"];                // 153-500 (6500K-2000K)
     
-    StaticJsonDocument<192> doc;
-    
-    DeserializationError error = deserializeJson(doc, rawLightState, DeserializationOption::Filter(filter));
-    
-    if (error) {
-      debugE("deserializeJson failed: %s", error.c_str());
-      return;
-    }
-
-    // step 3 of 3 - assign temporary state variables
-    JsonObject lightCurrentState = doc["state"];
-    long lightCurrentHue = lightCurrentState["hue"]; // 0(red)-65535(red); green = 21845 and blue = 43690
-    bool lightCurrentPower = lightCurrentState["on"]; // true = light is on
-    const char* lightCurrentEffect = lightCurrentState["effect"]; // "none" or "colorloop"
-    int lightCurrentBrightness = lightCurrentState["bri"]; // 1(minimum brightness)-254(maximum brightness)
-    int lightCurrentSaturation = lightCurrentState["sat"]; // 0(least saturated; white)-254(most saturated; full color)
-    int lightCurrentColorTemp = lightCurrentState["ct"]; // 153-500 (6500K-2000K)
-    debugI("Current light properties: Hue = %d, Brightness = %d, Saturation = %d, Temp = %d, effect = %s", lightCurrentHue, lightCurrentBrightness, lightCurrentSaturation, lightCurrentColorTemp, lightCurrentEffect);
+    debugI("Current light properties: Hue = %d, Brightness = %d, Saturation = %d, Temp = %d, effect = %s",lightCurrentHue, lightCurrentBrightness, lightCurrentSaturation, lightCurrentColorTemp, lightCurrentEffect);
 
     // process actions based on gesture, mode, and touch surface state
     if (gestureConfidence[GESTURE_FLICK] > 0.9) {                       // it's a flick, do flick things!
