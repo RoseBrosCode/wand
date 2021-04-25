@@ -10,6 +10,10 @@
 #define CHAN_1 1
 #define CHAN_2 2
 
+// RGB Colorloop state vars
+int rgbColorloopSection = 0; // this holds the state of where in the 6 rainbow sections (0-5) the colorloop is
+int rgbColorloopVar = 0; // this holds the state of the RGB LED colorloop variable
+
 // Initializes RGB pins.
 void setupRGBLED(int redPin, int greenPin, int bluePin)
 {
@@ -34,4 +38,47 @@ void setRGBLED(int r, int g, int b)
   ledcWrite(CHAN_0, r);
   ledcWrite(CHAN_1, g);
   ledcWrite(CHAN_2, b);
+}
+
+// Sets the LED to the next RGB color in the colorloop. TODO explore making cleaner by incrementing via HSV, and/or by adding in stable timing
+void incrementRGBColorloop()
+{
+  switch (rgbColorloopSection) {                          // implementing the 6 sections here https://academe.co.uk/wp-content/uploads/2012/04/451px-HSV-RGB-comparison.svg_.png
+    case 0:                                               // red stays up, green goes up, blue stays down
+      setRGBLED(255, rgbColorloopVar, 0);
+      rgbColorloopVar++;
+      if (rgbColorloopVar == 255) rgbColorloopSection++;  // next section
+      break;
+      
+    case 1:                                               // red goes down, green stays up, blue stays down
+      setRGBLED(rgbColorloopVar, 255, 0);
+      rgbColorloopVar--;
+      if (rgbColorloopVar == 0) rgbColorloopSection++;    // next section
+      break;
+      
+    case 2:                                               // red stays down, green stays up, blue goes up
+      setRGBLED(0, 255, rgbColorloopVar);
+      rgbColorloopVar++;
+      if (rgbColorloopVar == 255) rgbColorloopSection++;  // next section
+      break;
+      
+    case 3:                                               // red stays down, green goes down, blue stays up
+      setRGBLED(0, rgbColorloopVar, 255);
+      rgbColorloopVar--;
+      if (rgbColorloopVar == 0) rgbColorloopSection++;    // next section
+      break;
+      
+    case 4:                                               // red goes up, green stays down, blue stays up
+      setRGBLED(rgbColorloopVar, 0, 255);
+      rgbColorloopVar++;
+      if (rgbColorloopVar == 255) rgbColorloopSection++;  // next section
+      break;
+      
+    case 5:                                               // red stays up, green stays down, blue goes down
+      setRGBLED(255, 0, rgbColorloopVar);
+      rgbColorloopVar--;
+      if (rgbColorloopVar == 0) rgbColorloopSection = 0;  // back to the first section
+      break;
+      
+  }
 }
