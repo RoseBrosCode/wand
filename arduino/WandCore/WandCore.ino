@@ -274,6 +274,8 @@ void loop()
   // Take immediate action if single tap or double tap; if holding, action happens only if gesture is detected
   prevTouchEvent = currentTouchEvent;
   currentTouchEvent = getTouchEvent();
+  // N.B. Single tap is very inconsistent, exhibits frequent false negatives.
+  // May be fixed with tuning touch client, but avoid use for now.
   if (currentTouchEvent == SINGLE_TAP) {
     debugI("Single Tap Just Happened");
     if (wandMode == POWER) {                      // power mode, NOT DOING (was: single tap == set light brightness based on "brightness" of color sensed)
