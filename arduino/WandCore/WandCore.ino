@@ -39,7 +39,7 @@ int otaProgress = 0;
 ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
 
 // Defines the light the wand is hard-coded to. 
-int lightID = 33; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
+int lightID = 2; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -86,13 +86,15 @@ float sensorB;
 ////////////////////////////////////////////////////////////////////////////////////
 #include "TouchSurfaceClient.h"
 
+int currentTouchEvent = -1;
+int prevTouchEvent = -1;
 int lastLogged = -1; // DEBUG ONLY
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Set up remote debug
 ////////////////////////////////////////////////////////////////////////////////////
-#include <RemoteDebug.h>        //https://github.com/JoaoLopesF/RemoteDebug
+#include <RemoteDebug.h> // https://github.com/JoaoLopesF/RemoteDebug
 
 RemoteDebug Debug;
 ////////////////////////////////////////////////////////////////////////////////////
@@ -101,6 +103,14 @@ RemoteDebug Debug;
 // JSON Library
 ////////////////////////////////////////////////////////////////////////////////////
 #include <ArduinoJson.h>
+////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////
+// RGB Converter
+////////////////////////////////////////////////////////////////////////////////////
+#include "RGBConverter.h"
+
+RGBConverter converter = RGBConverter();
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -194,7 +204,7 @@ void setup()
   setupRGBLED(21, 17, 16);
 
   // Configure touch surface
-  setupTouchSurface(T9);
+  setupTouchSurface(T3);
 
   // Use the built-in LED as visual feedback
   pinMode(LED_BUILTIN, OUTPUT);
@@ -262,16 +272,16 @@ void loop()
 
   // Read the touch surface and handle the event
   // Take immediate action if single tap or double tap; if holding, action happens only if gesture is detected
-  int currentTouchEvent = getTouchEvent();
+  prevTouchEvent = currentTouchEvent;
+  currentTouchEvent = getTouchEvent();
   if (currentTouchEvent == SINGLE_TAP) {
     debugI("Single Tap Just Happened");
-    if (wandMode == POWER) {                      // power mode, single tap == set light brightness based on "brightness" of color sensed
+    if (wandMode == POWER) {                      // power mode, NOT DOING (was: single tap == set light brightness based on "brightness" of color sensed)
       // TODO
     }
-    else if (wandMode == COLOR) {                 // color mode, single tap == set color of light based on color sensed
+    else if (wandMode == COLOR) {                 // color mode, NOT DOING (was: single tap == set color of light based on color sensed)
       // TODO
-    }
-      
+    }  
   } else if (currentTouchEvent == DOUBLE_TAP) {
     debugI("Double Tap Just Happened");
     // toggle the wand's mode
@@ -283,6 +293,29 @@ void loop()
       wandMode = POWER;
       setRGBLED(255, 255, 255);                   // solid white for power mode
       debugI("Switched to Power Mode"); 
+    }
+  } else if (currentTouchEvent == HOLDING && prevTouchEvent != HOLDING) { // Captures the start of holding
+    debugI("Holding Start Just Happened");
+    if (wandMode == POWER) {                      // power mode, start holding == toggle color sensor LED
+      setColorSensorLED(!getColorSensorLED());
+    }
+    else if (wandMode == COLOR) {                 // color mode, start holding == set color of light based on color sensed
+      // read the color sensor
+      getRGB(&sensorR, &sensorG, &sensorB);
+
+      // convert rgb to hue
+      byte br = (uint16_t) sensorR;
+      byte bg = (uint16_t) sensorG;
+      byte bb = (uint16_t) sensorB;
+
+      debugI("Color sensor read: R: %u, G: %u, B: %u", br, bg, bb);
+      
+      double hsl[3] = {0.0, 0.0, 0.0};
+      converter.rgbToHsl(br, bg, bb, hsl);
+      unsigned int hue = (unsigned int) (hsl[0] * 65535);
+
+      // set light with hue API
+      myHue.setLight(lightID, myHue.ON, 254, 254, hue);
     }
   }
 
@@ -339,9 +372,6 @@ void loop()
         if (wandMode == POWER) {                                        // power mode, holding, flick == turn up the brightness
           // TODO
         }
-        else if (wandMode == COLOR) {                                   // color mode, holding, flick == increment color wheel on the light
-          // TODO
-        }
       } else {
         if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON);  // power mode, NOT holding, flick == turn on the light
         else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == cycle through pre-defined color favorites
@@ -353,9 +383,6 @@ void loop()
       debugI("Twist registered. Mode is %d", wandMode);
       if (currentTouchEvent == HOLDING) {
         if (wandMode == POWER) {                                        // power mode, holding, twist == turn down the brightness
-          // TODO
-        }
-        else if (wandMode == COLOR) {                                   // color mode, holding, twist == decrement color wheel on the light
           // TODO
         }
       } else {
