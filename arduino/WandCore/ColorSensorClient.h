@@ -15,6 +15,9 @@ void setupColorSensor(int ledPin);
 // Reads RGB data from the color sensor.
 void getRGB(float *r, float *g, float *b);
 
+// Gets the sensor's LED value.
+bool getColorSensorLED();
+
 // Sets the sensor's LED.
 void setColorSensorLED(bool val);
 

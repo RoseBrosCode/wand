@@ -10,7 +10,7 @@
 int touchPin;
 
 // Touch surface constants
-const int touchThreshold = 50;              // readings above this value mean the sensor is not being touched
+const int touchThreshold = 65;              // readings above this value mean the sensor is not being touched
 const int debounce = 20;                    // ms debounce period to prevent flickering when touching or stopping of touching the surface
 const int doubleTapGap = 250;               // max ms between taps for a double tap event
 const int holdTime = 1000;                  // ms hold period: how long to wait for hold event; TODO experiment if this can shorten

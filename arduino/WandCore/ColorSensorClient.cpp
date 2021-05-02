@@ -42,6 +42,9 @@ void getRGB(float *r, float *g, float *b)
   
   // Turn LED on for measurement
   setColorSensorLED(true);
+
+  // Wait for LED to turn on
+  delay(200);
   
   // Read color sensor
   myTCS.getRGB(r, g, b);
@@ -58,6 +61,14 @@ void getRGB(float *r, float *g, float *b)
     Serial.print(" B: ");
     Serial.println(*b);
   }
+}
+
+/*
+ * Gets the sensor's LED value.
+ */
+bool getColorSensorLED()
+{
+  return digitalRead(ledPin);
 }
 
 /*
