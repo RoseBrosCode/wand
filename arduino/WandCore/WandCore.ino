@@ -39,7 +39,7 @@ int otaProgress = 0;
 ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
 
 // Defines the light the wand is hard-coded to. 
-int lightID = 33; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
+int lightID = 2; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
