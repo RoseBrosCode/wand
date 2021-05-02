@@ -56,13 +56,16 @@ int getTouchEvent()
 {   
   int event = NO_INTERACTION; // if none of the below cases set a different event, then there's no interaction to report yet
   isTouched = checkIfTouched();
+
+  // Used debounced conditional for event detection
+  bool debouncedTouched = isTouched && (millis() - upTime) > debounce;
+  bool debouncedUntouched = not isTouched && (millis() - downTime) > debounce;
   
   // Surface is just touched
   if (isTouched == true                     // the surface is sensing a touch
   && wasTouchedLast == false                // last time through it did NOT sense a touch
   && (millis() - upTime) > debounce) {      // debounce
     downTime = millis();                    // set the new time of the most recent touch    
-    
     if ((millis() - upTime) < doubleTapGap  // the time since the previous release is less than the double tap gap
     && doubleTapOnUp == false               // we aren't already planning to send a double tap event once no longer being touched
     && doubleTapWaiting == true) {          // we were waiting to see if it was a double tap (and not just a single tap)
@@ -70,7 +73,7 @@ int getTouchEvent()
       doubleTapWaiting = false;             // reset this since we're no longer waiting and seeing
     } else doubleTapOnUp = false;          // otherwise it's not a double tap
   }
-  
+
   // Surface no longer being touched        
   else if (isTouched == false               // the surface is NOT sensing a touch
   && wasTouchedLast == true                 // last time through it DID sense a touch
@@ -97,9 +100,10 @@ int getTouchEvent()
     event = SINGLE_TAP;                     // set the single tap event
     doubleTapWaiting = false;               // double tap window missed so we're not waiting for it anymore
   }
-  
+
   // Test for hold event
-  if (isTouched == true                     // the surface is sensing a touch
+  if ((isTouched == true ||                 // the surfaces is sensing a touch
+       debouncedTouched || not debouncedUntouched )  // ensure HOLDING events persist false negatives for isTouched
   && (millis() - downTime) >= holdTime) {   // the touch has been continuous for longer than the hold time
     event = HOLDING;                        // set the hold event - note this gets sent continuously, not just when the hold starts
 
@@ -111,5 +115,5 @@ int getTouchEvent()
     }
   }
   wasTouchedLast = isTouched;               // store the state for the next pass
-  return event;                             
+  return event;
 }
