@@ -8,7 +8,6 @@
 #define COLOR_SENSOR_CLIENT
 
 #include "Adafruit_TCS34725.h"
-#include <RemoteDebug.h>
 
 // Connects to the color sensor over I2C.
 void setupColorSensor(int ledPin);
