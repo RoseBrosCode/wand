@@ -59,6 +59,19 @@ public:
      * @return  double hsv[]  The HSV representation
      */
     void rgbToHsv(byte r, byte g, byte b, double hsv[]);
+
+    /**
+     * Converts an RGB color value to CIE 1931 XY. Conversion formula
+     * adapted from https://stackoverflow.com/a/22649803.
+     * Assumes r, g, and b are contained in the set [0, 255] and
+     * returns x and y in the set [0, 1].
+     *
+     * @param   byte  r       The red color value
+     * @param   byte  g       The green color value
+     * @param   byte  b       The blue color value
+     * @return  double cie1931xy[]  The HSV representation
+     */
+    void rgbToCIE1931XY(byte r, byte g, byte b, double cie1931xy[]);
     
     /**
      * Converts an HSV color value to RGB. Conversion formula
@@ -72,8 +85,9 @@ public:
      * @return  byte    rgb[]   The RGB representation
      */
     void hsvToRgb(double h, double s, double v, byte rgb[]);
-     
+
 private:
+    double enhance_color_cie_1931(double normalized);
     double threeway_max(double a, double b, double c);
     double threeway_min(double a, double b, double c);
     double hue2rgb(double p, double q, double t);

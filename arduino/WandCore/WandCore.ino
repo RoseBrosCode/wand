@@ -39,7 +39,7 @@ int otaProgress = 0;
 ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
 
 // Defines the light the wand is hard-coded to. 
-int lightID = 2; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
+int lightID = 33; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -302,22 +302,50 @@ void loop()
       setColorSensorLED(!getColorSensorLED());
     }
     else if (wandMode == COLOR) {                 // color mode, start holding == set color of light based on color sensed
+      // Turn off LED to not interfere with color sensing
+      setRGBLED(0, 0, 0);
+
+      // Wait for LED to turn off
+      delay(50);
+
       // read the color sensor
       getRGB(&sensorR, &sensorG, &sensorB);
 
-      // convert rgb to hue
+      // cast rgb to byte for conversions
       byte br = (uint16_t) sensorR;
       byte bg = (uint16_t) sensorG;
       byte bb = (uint16_t) sensorB;
 
-      debugI("Color sensor read: R: %u, G: %u, B: %u", br, bg, bb);
-      
-      double hsl[3] = {0.0, 0.0, 0.0};
-      converter.rgbToHsl(br, bg, bb, hsl);
-      unsigned int hue = (unsigned int) (hsl[0] * 65535);
+      // NOTE: RGB readings are very dark
+      // translate from RGB to HSV, boost S and V, translate back to RGB, then to XY
 
-      // set light with hue API
-      myHue.setLight(lightID, myHue.ON, 254, 254, hue);
+      // RGB -> HSV
+      double hsv[3] = {0.0, 0.0, 0.0};
+      converter.rgbToHsv(br, bg, bb, hsv);
+
+      // boost HSV
+      double sBoost = 0.2;
+      double boostedS = min(hsv[1] + sBoost, 1.0);
+      double vBoost = 1.0;
+      double boostedV = min(hsv[2] + vBoost, 1.0);
+
+      // HSV (boosted) -> RGB
+      byte boostedRGB[3] = {0, 0, 0};
+      converter.hsvToRgb(hsv[0], boostedS, boostedV, boostedRGB);
+      
+      // RGB (boosted) -> XY
+      double xy[2] = {0.0, 0.0};
+      converter.rgbToCIE1931XY(boostedRGB[0], boostedRGB[1], boostedRGB[2], xy);
+
+      // debug print
+      debugI("Original: R: %u, G: %u, B: %u | H: %f, S: %f, V: %f", br, bg, bb, hsv[0], hsv[1], hsv[2]);
+      debugI("Boosted: R: %u, G: %u, B: %u | H: %f, S: %f, V: %f | X: %f, Y: %f", boostedRGB[0], boostedRGB[1], boostedRGB[2], hsv[0], boostedS, boostedV, xy[0], xy[1]);
+
+      // set light with hue API - CIE 1931 XY
+      myHue.setLight(lightID, myHue.ON, xy);
+
+      // Return LED to color loop
+      incrementRGBColorloop();
     }
   }
 
@@ -378,6 +406,16 @@ void loop()
         if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON);  // power mode, NOT holding, flick == turn on the light
         else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == cycle through pre-defined color favorites
           // TODO
+ 
+          // Desired XY color values
+          // 0.6779, 0.2968 - Red
+          // 0.6464, 0.3438 - Orange
+          // 0.5087, 0.4601 - Yellow
+          // 0.214, 0.709 - Green
+          // 0.1825, 0.4448 - Teal
+          // 0.1471, 0.149 - Blue
+          // 0.1996, 0.1041 - Purple
+          // 0.513, 0.2236 - Pink
         }
       }      
     }

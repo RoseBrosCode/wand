@@ -118,6 +118,37 @@ void RGBConverter::rgbToHsv(byte r, byte g, byte b, double hsv[]) {
 }
 
 /**
+ * Converts an RGB color value to CIE 1931 XY. Conversion formula
+ * adapted from https://stackoverflow.com/a/22649803.
+ * Assumes r, g, and b are contained in the set [0, 255] and
+ * returns x and y in the set [0, 1].
+ *
+ * @param   byte  r       The red color value
+ * @param   byte  g       The green color value
+ * @param   byte  b       The blue color value
+ * @return  double cie1931xy[]  The HSV representation
+ */
+void RGBConverter::rgbToCIE1931XY(byte r, byte g, byte b, double cie1931xy[]) {
+  double r0 = (double) r/255;
+  double g0 = (double) g/255;
+  double b0 = (double) b/255;
+
+  float red = (float) enhance_color_cie_1931(r0);
+  float green = (float) enhance_color_cie_1931(g0);
+  float blue = (float) enhance_color_cie_1931(b0);
+
+  float X = (float) (red * 0.649926 + green * 0.103455 + blue * 0.197109);
+  float Y = (float) (red * 0.234327 + green * 0.743075 + blue * 0.022598);
+  float Z = (float) (red * 0.0000000 + green * 0.053077 + blue * 1.035763);
+
+  float x = X / (X + Y + Z);
+  float y = Y / (X + Y + Z);
+
+  cie1931xy[0] = x;
+  cie1931xy[1] = y;
+}
+
+/**
  * Converts an HSV color value to RGB. Conversion formula
  * adapted from http://en.wikipedia.org/wiki/HSV_color_space.
  * Assumes h, s, and v are contained in the set [0, 1] and
@@ -149,6 +180,12 @@ void RGBConverter::hsvToRgb(double h, double s, double v, byte rgb[]) {
     rgb[0] = r * 255;
     rgb[1] = g * 255;
     rgb[2] = b * 255;
+}
+
+double RGBConverter::enhance_color_cie_1931(double normalized) {
+  if (normalized > 0.04045) {
+    return pow((normalized + 0.055) / (1.0 + 0.055), 2.4);
+  } else return normalized / 12.92;
 }
  
 double RGBConverter::threeway_max(double a, double b, double c) {
