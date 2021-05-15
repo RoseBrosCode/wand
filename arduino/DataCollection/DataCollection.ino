@@ -126,20 +126,6 @@ void setup()
     myFSS.g = dps2000;
     myICM.setFullScale((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myFSS);
 
-    // Use the built-in LED as visual feedback
-    pinMode(LED_BUILTIN, OUTPUT);
-
-    // Double flash to indicate end of setup
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-
-    // Print header of CSV file
-    Serial.println("aX,aY,aZ,gX,gY,gZ");
 }
 
 // The absolute acceleration threshold to begin IMU values
@@ -187,10 +173,6 @@ void loop()
             float gSum = fabs(gX) + fabs(gY) + fabs(gZ);
             if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) 
             {
-//                Serial.print("aSum: ");
-//                Serial.println(aSum);
-//                Serial.print("gSum: ");
-//                Serial.println(gSum);
                 // Start a new gesture recording by resetting sample counter
                 samplesRead = 0;
                 break;
@@ -210,58 +192,22 @@ void loop()
             aX = myICM.accX() / 1000;
             aY = myICM.accY() / 1000;
             aZ = myICM.accZ() / 1000;
-//            aX = round(myICM.accX()) / 1000;
-//            aY = round(myICM.accY()) / 1000;
-//            aZ = round(myICM.accZ()) / 1000;
 
             // Read gyroscope values
             gX = myICM.gyrX();
             gY = myICM.gyrY();
             gZ = myICM.gyrZ();
-//            gX = round(myICM.gyrX() * 1000) / 1000;
-//            gY = round(myICM.gyrY() * 1000) / 1000;
-//            gZ = round(myICM.gyrZ() * 1000) / 1000;
 
             // Increase sample counter
             samplesRead++;
-
-            // Print the data in expected CSV format
-//            Serial.print(aX, 3);
-//            Serial.print(',');
-//            Serial.print(aY, 3);
-//            Serial.print(',');
-//            Serial.print(aZ, 3);
-//            Serial.print(',');
-//            Serial.print(gX, 3);
-//            Serial.print(',');
-//            Serial.print(gY, 3);
-//            Serial.print(',');
-//            Serial.print(gZ, 3);
-//            Serial.println();
           
             debugI(",%f,%f,%f,%f,%f,%f", aX, aY, aZ, gX, gY, gZ);
 
             // Add an empty line after the last sample
             if (samplesRead == numSamplesPerGesture)
             {
-//                Serial.println();
                 debugI("");
             }
         }
-    }
-
-    // Triple flash to indicate recording done
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
-
-    
+    }    
 }
