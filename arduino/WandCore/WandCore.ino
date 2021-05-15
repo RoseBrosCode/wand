@@ -1,7 +1,7 @@
 /*
   Wand Core
 
-  Contains variable definitions and main functions the Project Sparkle wand.
+  Contains variable definitions and main functions for the Project Sparkle wand.
 */
 #define HOST_NAME "sparklewand"
 ////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ int otaProgress = 0;
 ESPHue myHue = ESPHue(client, myHUEAPIKEY, myHUEBRIDGEIP, 80);
 
 // Defines the light the wand is hard-coded to. 
-int lightID = 33; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
+int lightID = 2; // CJ's Room is 33, Zach's Nightstand is 2, Piano Lamp is 14
 ////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -122,6 +122,20 @@ RGBConverter converter = RGBConverter();
 #define POWER 0
 #define COLOR 1
 int wandMode = POWER; // default on boot
+
+// Desired XY color values
+#define NUM_CYCLE_COLORS 8
+double cycleColors[NUM_CYCLE_COLORS][2] = {
+  { 0.6779, 0.2968 }, // Red
+  { 0.6464, 0.3438 }, // Orange
+  { 0.5087, 0.4601 }, // Yellow
+  { 0.2140, 0.7090 }, // Green
+  { 0.1825, 0.4448 }, // Teal
+  { 0.1471, 0.1490 }, // Blue
+  { 0.1996, 0.1041 }, // Purple
+  { 0.5130, 0.2236 }  // Pink
+};
+int cycleColorsIndex = 0;
 ////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -281,10 +295,10 @@ void loop()
   if (currentTouchEvent == SINGLE_TAP) {
     debugI("Single Tap Just Happened");
     if (wandMode == POWER) {                      // power mode, NOT DOING (was: single tap == set light brightness based on "brightness" of color sensed)
-      // TODO
+      // NOT DOING
     }
     else if (wandMode == COLOR) {                 // color mode, NOT DOING (was: single tap == set color of light based on color sensed)
-      // TODO
+      // NOT DOING
     }  
   } else if (currentTouchEvent == DOUBLE_TAP) {
     debugI("Double Tap Just Happened");
@@ -360,6 +374,7 @@ void loop()
   if (aSum >= accelerationThresholdG || gSum >= gyroThreshold) {
     // do the gesture predicting
     readAndPredictGesture(imuData, gestureConfidence);
+    debugI("Flick confidence: %f, Twist confidence: %f", gestureConfidence[GESTURE_FLICK], gestureConfidence[GESTURE_TWIST]);
     
     // read target light state
     // only do this here as it's not needed elsewhere and this minimizes polling
@@ -403,22 +418,23 @@ void loop()
       debugI("Flick registered. Mode is %d.", wandMode);
       if (currentTouchEvent == HOLDING) {
         if (wandMode == POWER) {                                        // power mode, holding, flick == turn up the brightness
-          // TODO
+          // calculate new brightness
+          int newBrightness = min(lightCurrentBrightness + 25, 254); // 25 ~ 10% brightness increase
+
+          // set brightness
+          myHue.setLightBrightness(lightID, newBrightness);
         }
       } else {
         if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON);  // power mode, NOT holding, flick == turn on the light
         else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == cycle through pre-defined color favorites
-          // TODO
- 
-          // Desired XY color values
-          // 0.6779, 0.2968 - Red
-          // 0.6464, 0.3438 - Orange
-          // 0.5087, 0.4601 - Yellow
-          // 0.214, 0.709 - Green
-          // 0.1825, 0.4448 - Teal
-          // 0.1471, 0.149 - Blue
-          // 0.1996, 0.1041 - Purple
-          // 0.513, 0.2236 - Pink
+          // ensure color loop is off
+          myHue.setLightColorloop(lightID, myHue.OFF);
+          
+          // set color to current cycle color
+          myHue.setLight(lightID, lightCurrentPower, cycleColors[cycleColorsIndex]);
+
+          // increment cycle color
+          cycleColorsIndex = (cycleColorsIndex + 1) % NUM_CYCLE_COLORS;
         }
       }      
     }
@@ -426,7 +442,11 @@ void loop()
       debugI("Twist registered. Mode is %d", wandMode);
       if (currentTouchEvent == HOLDING) {
         if (wandMode == POWER) {                                        // power mode, holding, twist == turn down the brightness
-          // TODO
+          // calculate new brightness
+          int newBrightness = max(lightCurrentBrightness - 25, 1); // 25 ~ 10% brightness decrease
+          
+          // set brightness
+          myHue.setLightBrightness(lightID, newBrightness);
         }
       } else {
         if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // power mode, NOT holding, twist == turn off the light
