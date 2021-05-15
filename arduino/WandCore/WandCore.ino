@@ -88,6 +88,8 @@ float sensorB;
 
 int currentTouchEvent = -1;
 int prevTouchEvent = -1;
+unsigned long lastHoldingEvent = 0;
+int holdingDebounce = 1200;
 int lastLogged = -1; // DEBUG ONLY
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -296,8 +298,9 @@ void loop()
       setRGBLED(255, 255, 255);                   // solid white for power mode
       debugI("Switched to Power Mode"); 
     }
-  } else if (currentTouchEvent == HOLDING && prevTouchEvent != HOLDING) { // Captures the start of holding
+  } else if (currentTouchEvent == HOLDING && prevTouchEvent != HOLDING && (millis() - lastHoldingEvent) > holdingDebounce) { // Captures the start of holding
     debugI("Holding Start Just Happened");
+    lastHoldingEvent = millis();
     if (wandMode == POWER) {                      // power mode, start holding == toggle color sensor LED
       setColorSensorLED(!getColorSensorLED());
     }
