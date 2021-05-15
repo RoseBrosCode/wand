@@ -16,7 +16,7 @@
 #include "IMUClient.h"
 
 // Trained model file
-#include "model1_2ges_nolasso.h"
+#include "model_final.h"
 
 
 // TensorFlow Lite dependencies
