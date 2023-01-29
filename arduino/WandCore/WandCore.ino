@@ -278,6 +278,10 @@ void loop()
   // Read IMU sensor
   readIMU(imuData);
 
+  // Define flags for operations that require light state
+  bool shouldToggleColorLoop = false;
+  bool shouldToggleLightPower = false;
+
   // Read the touch surface and handle the event
   // Take immediate action if single tap or double tap; if holding, action happens only if gesture is detected
   prevTouchEvent = currentTouchEvent;
@@ -289,8 +293,7 @@ void loop()
   } else if (currentTouchEvent == DOUBLE_TAP) {
     // Double tap == toggle colorloop
     debugI("Double Tap Just Happened");
-    if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
-    else myHue.setLightColorloop(lightID, myHue.ON);
+    shouldToggleColorLoop = true;
   } else if (currentTouchEvent == HOLDING && prevTouchEvent != HOLDING && (millis() - lastHoldingEvent) > holdingDebounce) { // Captures the start of holding
     // Holding == detect and set color
     debugI("Holding Start Just Happened");
@@ -356,9 +359,27 @@ void loop()
     // do the gesture predicting
     readAndPredictGesture(imuData, gestureConfidence);
     debugI("Flick confidence: %f, Twist confidence: %f", gestureConfidence[GESTURE_FLICK], gestureConfidence[GESTURE_TWIST]);
-    
+
+    // As of 1/29/2023, gesture detection is inconsistent enough and the concept complex enough that
+    // we do not want to assign behavior to only one gesture. Either gesture will result in the same
+    // behavior
+    bool gestureDetected = false;
+    if (gestureConfidence[GESTURE_FLICK] > 0.9) {
+      debugI("Flick registered.");
+      gestureDetected = true;
+    } else if (gestureConfidence[GESTURE_TWIST] > 0.9) {
+      debugI("Twist registered.");
+      gestureDetected = true;  
+    }
+    if (gestureDetected) {
+      // Gesture == toggle light power
+      shouldToggleLightPower = true;
+    }
+  }
+
+  // We need Hue light state to do these operations, only fetch Hue state when we need it
+  if (shouldToggleLightPower || shouldToggleColorLoop) {
     // read target light state
-    // only do this here as it's not needed elsewhere and this minimizes polling
     // step 1 of 3 - prepare the raw string from the Hue library
     String rawLightState = myHue.getLightInfo(lightID);
     int removeToIdx = rawLightState.indexOf("{") - 1;
@@ -393,24 +414,13 @@ void loop()
     int lightCurrentColorTemp = lightCurrentState["ct"]; // 153-500 (6500K-2000K)
     debugI("Current light properties: Hue = %d, Brightness = %d, Saturation = %d, Temp = %d, effect = %s", lightCurrentHue, lightCurrentBrightness, lightCurrentSaturation, lightCurrentColorTemp, lightCurrentEffect);
 
-    // As of 1/29/2023, gesture detection is inconsistent enough and the concept complex enough that
-    // we do not want to assign behavior to only one gesture. Either gesture will result in the same
-    // behavior
-    bool gestureDetected = false;
-    if (gestureConfidence[GESTURE_FLICK] > 0.9) {
-      debugI("Flick registered.");
-      gestureDetected = true;
-    } else if (gestureConfidence[GESTURE_TWIST] > 0.9) {
-      debugI("Twist registered.");
-      gestureDetected = true;  
-    }
-    if (gestureDetected) {
-      // Gesture == toggle light power
-      if (lightCurrentPower) {
-          myHue.setLightPower(lightID, myHue.OFF);
-        } else {
-          myHue.setLightPower(lightID, myHue.ON);
-        }
+    // If double-tap and gesture occur at the same time, respect the gesture
+    if (shouldToggleLightPower) {
+      if (lightCurrentPower) myHue.setLightPower(lightID, myHue.OFF);
+      else myHue.setLightPower(lightID, myHue.ON);
+    } else if (shouldToggleColorLoop) {
+      if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
+      else myHue.setLightColorloop(lightID, myHue.ON);
     }
   }
 
