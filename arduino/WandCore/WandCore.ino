@@ -242,7 +242,8 @@ void setup()
   setRGBLED(0, 255, 0);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
-  setRGBLED(255, 255, 255); // white for power mode, which is default
+  // 1/28/2023 - Don't set to white with removal of modes
+//  setRGBLED(255, 255, 255); // white for power mode, which is default
 
   // DEBUG ONLY
   // testDevices();
@@ -278,10 +279,12 @@ void loop()
   // Check for OTA
   ArduinoOTA.handle();
 
-  // If in Color Mode, increment the RGB LED in the loop
-  if (wandMode == COLOR) {
-    incrementRGBColorloop();
-  }
+  // 1/28/2023 - always colorloop with removal of modes
+  incrementRGBColorloop();
+//  // If in Color Mode, increment the RGB LED in the loop
+//  if (wandMode == COLOR) {
+//    incrementRGBColorloop();
+//  }
 
   // Read IMU sensor
   readIMU(imuData);
@@ -302,68 +305,72 @@ void loop()
     }  
   } else if (currentTouchEvent == DOUBLE_TAP) {
     debugI("Double Tap Just Happened");
-    // toggle the wand's mode
-    if (wandMode == POWER) {                      // power mode, double tap == switch to color mode
-      wandMode = COLOR;
-      incrementRGBColorloop();                    // resume cycling the onboard RGB through its colorloop
-      debugI("Switched to Color Mode");
-    } else {                                      // color mode, double tap == switch to power mode
-      wandMode = POWER;
-      setRGBLED(255, 255, 255);                   // solid white for power mode
-      debugI("Switched to Power Mode"); 
-    }
+    // toggle the wand's mode - 1/28/2023 - disable the concept of modes for Ceej simplicity
+//    if (wandMode == POWER) {                      // power mode, double tap == switch to color mode
+//      wandMode = COLOR;
+//      incrementRGBColorloop();                    // resume cycling the onboard RGB through its colorloop
+//      debugI("Switched to Color Mode");
+//    } else {                                      // color mode, double tap == switch to power mode
+//      wandMode = POWER;
+//      setRGBLED(255, 255, 255);                   // solid white for power mode
+//      debugI("Switched to Power Mode"); 
+//    }
   } else if (currentTouchEvent == HOLDING && prevTouchEvent != HOLDING && (millis() - lastHoldingEvent) > holdingDebounce) { // Captures the start of holding
     debugI("Holding Start Just Happened");
     lastHoldingEvent = millis();
-    if (wandMode == POWER) {                      // power mode, start holding == toggle color sensor LED
-      setColorSensorLED(!getColorSensorLED());
-    }
-    else if (wandMode == COLOR) {                 // color mode, start holding == set color of light based on color sensed
-      // Turn off LED to not interfere with color sensing
-      setRGBLED(0, 0, 0);
+      // 1/28/2023 - removed flashlight function with removal of modes
+//    if (wandMode == POWER) {                      // power mode, start holding == toggle color sensor LED
+//      setColorSensorLED(!getColorSensorLED());
+//    }
+//    else if (wandMode == COLOR) {                 // color mode, start holding == set color of light based on color sensed
+    // Turn off LED to not interfere with color sensing
+    setRGBLED(0, 0, 0);
 
-      // Wait for LED to turn off
-      delay(50);
+    // Wait for LED to turn off
+    delay(50);
 
-      // read the color sensor
-      getRGB(&sensorR, &sensorG, &sensorB);
+    // read the color sensor
+    getRGB(&sensorR, &sensorG, &sensorB);
 
-      // cast rgb to byte for conversions
-      byte br = (uint16_t) sensorR;
-      byte bg = (uint16_t) sensorG;
-      byte bb = (uint16_t) sensorB;
+    // cast rgb to byte for conversions
+    byte br = (uint16_t) sensorR;
+    byte bg = (uint16_t) sensorG;
+    byte bb = (uint16_t) sensorB;
 
-      // NOTE: RGB readings are very dark
-      // translate from RGB to HSV, boost S and V, translate back to RGB, then to XY
+    // NOTE: RGB readings are very dark
+    // translate from RGB to HSV, boost S and V, translate back to RGB, then to XY
 
-      // RGB -> HSV
-      double hsv[3] = {0.0, 0.0, 0.0};
-      converter.rgbToHsv(br, bg, bb, hsv);
+    // RGB -> HSV
+    double hsv[3] = {0.0, 0.0, 0.0};
+    converter.rgbToHsv(br, bg, bb, hsv);
 
-      // boost HSV
-      double sBoost = 0.2;
-      double boostedS = min(hsv[1] + sBoost, 1.0);
-      double vBoost = 1.0;
-      double boostedV = min(hsv[2] + vBoost, 1.0);
+    // boost HSV
+    double sBoost = 0.2;
+    double boostedS = min(hsv[1] + sBoost, 1.0);
+    double vBoost = 1.0;
+    double boostedV = min(hsv[2] + vBoost, 1.0);
 
-      // HSV (boosted) -> RGB
-      byte boostedRGB[3] = {0, 0, 0};
-      converter.hsvToRgb(hsv[0], boostedS, boostedV, boostedRGB);
-      
-      // RGB (boosted) -> XY
-      double xy[2] = {0.0, 0.0};
-      converter.rgbToCIE1931XY(boostedRGB[0], boostedRGB[1], boostedRGB[2], xy);
+    // HSV (boosted) -> RGB
+    byte boostedRGB[3] = {0, 0, 0};
+    converter.hsvToRgb(hsv[0], boostedS, boostedV, boostedRGB);
+    
+    // RGB (boosted) -> XY
+    double xy[2] = {0.0, 0.0};
+    converter.rgbToCIE1931XY(boostedRGB[0], boostedRGB[1], boostedRGB[2], xy);
 
-      // debug print
-      debugI("Original: R: %u, G: %u, B: %u | H: %f, S: %f, V: %f", br, bg, bb, hsv[0], hsv[1], hsv[2]);
-      debugI("Boosted: R: %u, G: %u, B: %u | H: %f, S: %f, V: %f | X: %f, Y: %f", boostedRGB[0], boostedRGB[1], boostedRGB[2], hsv[0], boostedS, boostedV, xy[0], xy[1]);
+    // debug print
+    debugI("Original: R: %u, G: %u, B: %u | H: %f, S: %f, V: %f", br, bg, bb, hsv[0], hsv[1], hsv[2]);
+    debugI("Boosted: R: %u, G: %u, B: %u | H: %f, S: %f, V: %f | X: %f, Y: %f", boostedRGB[0], boostedRGB[1], boostedRGB[2], hsv[0], boostedS, boostedV, xy[0], xy[1]);
 
-      // set light with hue API - CIE 1931 XY
-      myHue.setLight(lightID, myHue.ON, xy);
+    // Stop colorloop
+    myHue.setLightColorloop(lightID, myHue.OFF);
 
-      // Return LED to color loop
-      incrementRGBColorloop();
-    }
+    // set light with hue API - CIE 1931 XY
+    myHue.setLight(lightID, myHue.ON, xy);
+
+    // Return LED to color loop
+    incrementRGBColorloop();
+//    }
   }
 
   // Calculate sum of acceleration to compare to threshold
@@ -417,43 +424,51 @@ void loop()
     if (gestureConfidence[GESTURE_FLICK] > 0.9) {                       // it's a flick, do flick things!
       debugI("Flick registered. Mode is %d.", wandMode);
       if (currentTouchEvent == HOLDING) {
-        if (wandMode == POWER) {                                        // power mode, holding, flick == turn up the brightness
-          // calculate new brightness
-          int newBrightness = min(lightCurrentBrightness + 25, 254); // 25 ~ 10% brightness increase
-
-          // set brightness
-          myHue.setLightBrightness(lightID, newBrightness);
-        }
+        // 1/28/2023 - removed brightness adjustment with removal of modes
+//        if (wandMode == POWER) {                                        // power mode, holding, flick == turn up the brightness
+//          // calculate new brightness
+//          int newBrightness = min(lightCurrentBrightness + 25, 254); // 25 ~ 10% brightness increase
+//
+//          // set brightness
+//          myHue.setLightBrightness(lightID, newBrightness);
+//        }
       } else {
-        if (wandMode == POWER) myHue.setLightPower(lightID, myHue.ON);  // power mode, NOT holding, flick == turn on the light
-        else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == cycle through pre-defined color favorites
-          // ensure color loop is off
-          myHue.setLightColorloop(lightID, myHue.OFF);
-          
-          // set color to current cycle color
-          myHue.setLight(lightID, lightCurrentPower, cycleColors[cycleColorsIndex]);
-
-          // increment cycle color
-          cycleColorsIndex = (cycleColorsIndex + 1) % NUM_CYCLE_COLORS;
+//        if (wandMode == POWER) {                                        // power mode, NOT holding, flick == toggle the light
+        if (lightCurrentPower) {
+          myHue.setLightPower(lightID, myHue.OFF);
+        } else {
+          myHue.setLightPower(lightID, myHue.ON);
         }
+//        } else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == toggle colorloop on light
+//        }
       }      
     }
     else if (gestureConfidence[GESTURE_TWIST] > 0.9) {                  // it's a twist, do twist things!    
       debugI("Twist registered. Mode is %d", wandMode);
       if (currentTouchEvent == HOLDING) {
-        if (wandMode == POWER) {                                        // power mode, holding, twist == turn down the brightness
-          // calculate new brightness
-          int newBrightness = max(lightCurrentBrightness - 25, 1); // 25 ~ 10% brightness decrease
-          
-          // set brightness
-          myHue.setLightBrightness(lightID, newBrightness);
-        }
+        // 1/28/2023 - removed brightness adjustment with removal of modes
+//        if (wandMode == POWER) {                                        // power mode, holding, twist == turn down the brightness
+//          // calculate new brightness
+//          int newBrightness = max(lightCurrentBrightness - 25, 1); // 25 ~ 10% brightness decrease
+//          
+//          // set brightness
+//          myHue.setLightBrightness(lightID, newBrightness);
+//        }
       } else {
-        if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // power mode, NOT holding, twist == turn off the light
-        else if (wandMode == COLOR) {                                   // color mode, NOT holding, twist == toggle colorloop on light
-          if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
-          else myHue.setLightColorloop(lightID, myHue.ON);
-        }       
+        // 1/28/2023 - toggle colorloop on twist with removal of modes
+//        if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // power mode, NOT holding, twist == turn off the light
+//        else if (wandMode == COLOR) {                                   // color mode, NOT holding, twist == cycle through pre-defined color favorites
+//          // ensure color loop is off
+//          myHue.setLightColorloop(lightID, myHue.OFF);
+//          
+//          // set color to current cycle color
+//          myHue.setLight(lightID, lightCurrentPower, cycleColors[cycleColorsIndex]);
+//
+//          // increment cycle color
+//          cycleColorsIndex = (cycleColorsIndex + 1) % NUM_CYCLE_COLORS;
+//        }
+        if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
+        else myHue.setLightColorloop(lightID, myHue.ON);       
       }      
     }
   }
