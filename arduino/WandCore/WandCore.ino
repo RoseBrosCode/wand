@@ -118,11 +118,6 @@ RGBConverter converter = RGBConverter();
 ////////////////////////////////////////////////////////////////////////////////////
 // Set up wand state variables
 ////////////////////////////////////////////////////////////////////////////////////
-// wand mode definitions
-#define POWER 0
-#define COLOR 1
-int wandMode = POWER; // default on boot
-
 // Desired XY color values
 #define NUM_CYCLE_COLORS 8
 double cycleColors[NUM_CYCLE_COLORS][2] = {
@@ -242,8 +237,6 @@ void setup()
   setRGBLED(0, 255, 0);
   delay(200);
   digitalWrite(LED_BUILTIN, LOW);
-  // 1/28/2023 - Don't set to white with removal of modes
-//  setRGBLED(255, 255, 255); // white for power mode, which is default
 
   // DEBUG ONLY
   // testDevices();
@@ -279,12 +272,8 @@ void loop()
   // Check for OTA
   ArduinoOTA.handle();
 
-  // 1/28/2023 - always colorloop with removal of modes
+  // Always be color looping
   incrementRGBColorloop();
-//  // If in Color Mode, increment the RGB LED in the loop
-//  if (wandMode == COLOR) {
-//    incrementRGBColorloop();
-//  }
 
   // Read IMU sensor
   readIMU(imuData);
@@ -293,36 +282,22 @@ void loop()
   // Take immediate action if single tap or double tap; if holding, action happens only if gesture is detected
   prevTouchEvent = currentTouchEvent;
   currentTouchEvent = getTouchEvent();
-  // N.B. Single tap is very inconsistent, exhibits frequent false negatives.
-  // May be fixed with tuning touch client, but avoid use for now.
   if (currentTouchEvent == SINGLE_TAP) {
+    // N.B. Single tap is very inconsistent, exhibits frequent false negatives.
+    // May be fixed with tuning touch client, but avoid use for now.
     debugI("Single Tap Just Happened");
-    if (wandMode == POWER) {                      // power mode, NOT DOING (was: single tap == set light brightness based on "brightness" of color sensed)
-      // NOT DOING
-    }
-    else if (wandMode == COLOR) {                 // color mode, NOT DOING (was: single tap == set color of light based on color sensed)
-      // NOT DOING
-    }  
   } else if (currentTouchEvent == DOUBLE_TAP) {
+    // Double tap == toggle colorloop
     debugI("Double Tap Just Happened");
-    // toggle the wand's mode - 1/28/2023 - disable the concept of modes for Ceej simplicity
-//    if (wandMode == POWER) {                      // power mode, double tap == switch to color mode
-//      wandMode = COLOR;
-//      incrementRGBColorloop();                    // resume cycling the onboard RGB through its colorloop
-//      debugI("Switched to Color Mode");
-//    } else {                                      // color mode, double tap == switch to power mode
-//      wandMode = POWER;
-//      setRGBLED(255, 255, 255);                   // solid white for power mode
-//      debugI("Switched to Power Mode"); 
-//    }
+    if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
+    else myHue.setLightColorloop(lightID, myHue.ON);
   } else if (currentTouchEvent == HOLDING && prevTouchEvent != HOLDING && (millis() - lastHoldingEvent) > holdingDebounce) { // Captures the start of holding
+    // Holding == detect and set color
     debugI("Holding Start Just Happened");
+    
+    // Capture time to debounce holding detection
     lastHoldingEvent = millis();
-      // 1/28/2023 - removed flashlight function with removal of modes
-//    if (wandMode == POWER) {                      // power mode, start holding == toggle color sensor LED
-//      setColorSensorLED(!getColorSensorLED());
-//    }
-//    else if (wandMode == COLOR) {                 // color mode, start holding == set color of light based on color sensed
+
     // Turn off LED to not interfere with color sensing
     setRGBLED(0, 0, 0);
 
@@ -370,7 +345,6 @@ void loop()
 
     // Return LED to color loop
     incrementRGBColorloop();
-//    }
   }
 
   // Calculate sum of acceleration to compare to threshold
@@ -386,8 +360,7 @@ void loop()
     // read target light state
     // only do this here as it's not needed elsewhere and this minimizes polling
     // step 1 of 3 - prepare the raw string from the Hue library
-    String rawLightState;
-    rawLightState = myHue.getLightInfo(lightID);
+    String rawLightState = myHue.getLightInfo(lightID);
     int removeToIdx = rawLightState.indexOf("{") - 1;
     rawLightState.remove(0, removeToIdx);
 
@@ -420,56 +393,24 @@ void loop()
     int lightCurrentColorTemp = lightCurrentState["ct"]; // 153-500 (6500K-2000K)
     debugI("Current light properties: Hue = %d, Brightness = %d, Saturation = %d, Temp = %d, effect = %s", lightCurrentHue, lightCurrentBrightness, lightCurrentSaturation, lightCurrentColorTemp, lightCurrentEffect);
 
-    // process actions based on gesture, mode, and touch surface state
-    if (gestureConfidence[GESTURE_FLICK] > 0.9) {                       // it's a flick, do flick things!
-      debugI("Flick registered. Mode is %d.", wandMode);
-      if (currentTouchEvent == HOLDING) {
-        // 1/28/2023 - removed brightness adjustment with removal of modes
-//        if (wandMode == POWER) {                                        // power mode, holding, flick == turn up the brightness
-//          // calculate new brightness
-//          int newBrightness = min(lightCurrentBrightness + 25, 254); // 25 ~ 10% brightness increase
-//
-//          // set brightness
-//          myHue.setLightBrightness(lightID, newBrightness);
-//        }
-      } else {
-//        if (wandMode == POWER) {                                        // power mode, NOT holding, flick == toggle the light
-        if (lightCurrentPower) {
+    // As of 1/29/2023, gesture detection is inconsistent enough and the concept complex enough that
+    // we do not want to assign behavior to only one gesture. Either gesture will result in the same
+    // behavior
+    bool gestureDetected = false;
+    if (gestureConfidence[GESTURE_FLICK] > 0.9) {
+      debugI("Flick registered.");
+      gestureDetected = true;
+    } else if (gestureConfidence[GESTURE_TWIST] > 0.9) {
+      debugI("Twist registered.");
+      gestureDetected = true;  
+    }
+    if (gestureDetected) {
+      // Gesture == toggle light power
+      if (lightCurrentPower) {
           myHue.setLightPower(lightID, myHue.OFF);
         } else {
           myHue.setLightPower(lightID, myHue.ON);
         }
-//        } else if (wandMode == COLOR) {                                   // color mode, NOT holding, flick == toggle colorloop on light
-//        }
-      }      
-    }
-    else if (gestureConfidence[GESTURE_TWIST] > 0.9) {                  // it's a twist, do twist things!    
-      debugI("Twist registered. Mode is %d", wandMode);
-      if (currentTouchEvent == HOLDING) {
-        // 1/28/2023 - removed brightness adjustment with removal of modes
-//        if (wandMode == POWER) {                                        // power mode, holding, twist == turn down the brightness
-//          // calculate new brightness
-//          int newBrightness = max(lightCurrentBrightness - 25, 1); // 25 ~ 10% brightness decrease
-//          
-//          // set brightness
-//          myHue.setLightBrightness(lightID, newBrightness);
-//        }
-      } else {
-        // 1/28/2023 - toggle colorloop on twist with removal of modes
-//        if (wandMode == POWER) myHue.setLightPower(lightID, myHue.OFF); // power mode, NOT holding, twist == turn off the light
-//        else if (wandMode == COLOR) {                                   // color mode, NOT holding, twist == cycle through pre-defined color favorites
-//          // ensure color loop is off
-//          myHue.setLightColorloop(lightID, myHue.OFF);
-//          
-//          // set color to current cycle color
-//          myHue.setLight(lightID, lightCurrentPower, cycleColors[cycleColorsIndex]);
-//
-//          // increment cycle color
-//          cycleColorsIndex = (cycleColorsIndex + 1) % NUM_CYCLE_COLORS;
-//        }
-        if (String(lightCurrentEffect) == "colorloop") myHue.setLightColorloop(lightID, myHue.OFF);
-        else myHue.setLightColorloop(lightID, myHue.ON);       
-      }      
     }
   }
 
